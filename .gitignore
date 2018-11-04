@@ -1,3 +1,18 @@
+# Unblock CHN
+*.tpl
+*.conf
+ipset.rules
+ipset.headless.rules
+dnsmasq.conf.add
+ss-redir.json
+ss-redir.pid
+unblockchn.log
+unblockchn.surge.ruleset
+config.py
+
+# JetBrains
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
