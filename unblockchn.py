@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import re
 import sys
 import time
@@ -49,7 +50,7 @@ class Router(object):
 
     @classmethod
     def execute(cls, raw_args):
-        """python3 unblockchn.py router [-h] {status,on,off,check,renew,setup,restore}
+        """python3 unblockchn.py router [-h] {status,on,off,check,renew,setup,restore,create}
 
 Unblock CHN 路由器命令：
   status                  查看代理状态
@@ -59,11 +60,16 @@ Unblock CHN 路由器命令：
   renew                   更新规则
   setup [--no-ss]         一键配置路由器 [--no-ss: 跳过配置 ss-redir]
   restore [--no-ss]       还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
+  create                  仅生成 ipset 和 dnsmasq 规则配置文件
 """
         parser = argparse.ArgumentParser(usage=cls.execute.__doc__)
         parser.add_argument(
-            'cmd', choices=['status', 'on', 'off', 'check', 'renew', 'setup', 'restore'])
+            'cmd', choices=['status', 'on', 'off', 'check', 'renew', 'setup', 'restore', 'create'])
         args = parser.parse_args(raw_args[0:1])
+
+        if args.cmd == 'create':
+            cls.cmd_create()
+            return
 
         # 检查 iptables 和 ipset 命令是否存在
         cls.check_ipset_iptables()
@@ -295,6 +301,16 @@ Unblock CHN 还原路由器为未配置状态
         cls.restart_dnsmasq()
 
         ologger.info("还原成功")
+
+    @classmethod
+    def cmd_create(cls):
+        """仅生成 ipset 和 dnsmasq 规则配置文件"""
+
+        # 生成路由器配置文件
+        unblock_youku = UnblockYouku()
+        cls.create_conf_files(unblock_youku.black_domains)
+
+        ologger.info("生成配置文件成功")
 
     @classmethod
     def create_conf_files(cls, domains):

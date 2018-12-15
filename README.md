@@ -19,6 +19,7 @@ Unblock CHN 是一个帮助配置 Shadowsocks 回国代理分流的命令行小�
         - [检查 <URL/IP/域名> 是否走代理](#%E6%A3%80%E6%9F%A5-urlip%E5%9F%9F%E5%90%8D-%E6%98%AF%E5%90%A6%E8%B5%B0%E4%BB%A3%E7%90%86)
         - [更新规则](#%E6%9B%B4%E6%96%B0%E8%A7%84%E5%88%99)
         - [还原路由器为未配置状态](#%E8%BF%98%E5%8E%9F%E8%B7%AF%E7%94%B1%E5%99%A8%E4%B8%BA%E6%9C%AA%E9%85%8D%E7%BD%AE%E7%8A%B6%E6%80%81)
+        - [仅生成 ipset 和 dnsmasq 规则配置文件](#%E4%BB%85%E7%94%9F%E6%88%90-ipset-%E5%92%8C-dnsmasq-%E8%A7%84%E5%88%99%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6)
         - [修改规则模板](#%E4%BF%AE%E6%94%B9%E8%A7%84%E5%88%99%E6%A8%A1%E6%9D%BF)
     + [远程控制工具](#%E8%BF%9C%E7%A8%8B%E6%8E%A7%E5%88%B6%E5%B7%A5%E5%85%B7)
         - [iOS 捷径（Shortcut）](#ios-%E6%8D%B7%E5%BE%84shortcut)
@@ -93,7 +94,7 @@ $ pip3 install -r requirements.txt
 
 ```console
 $ python3 unblockchn.py router --help
-usage: python3 unblockchn.py router [-h] {status,on,off,check,renew,setup,restore}
+usage: python3 unblockchn.py router [-h] {status,on,off,check,renew,setup,restore,create}
 
 Unblock CHN 路由器命令：
   status                  查看代理状态
@@ -103,9 +104,10 @@ Unblock CHN 路由器命令：
   renew                   更新规则
   setup [--no-ss]         一键配置路由器 [--no-ss: 跳过配置 ss-redir]
   restore [--no-ss]       还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
+  create                  仅生成 ipset 和 dnsmasq 规则配置文件
 
 positional arguments:
-  {status,on,off,check,renew,setup,restore}
+  {status,on,off,check,renew,setup,restore,create}
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -225,6 +227,19 @@ $ python3 unblockchn.py router restore
 ```console
 $ python3 unblockchn.py router restore --no-ss
 ```
+
+#### 仅生成 ipset 和 dnsmasq 规则配置文件
+
+```console
+$ python3 unblockchn.py router create
+✔ 生成 ipset 默认配置模板文件：ipset.rules.tpl
+✔ 生成 ipset 配置文件：ipset.rules & ipset.headless.rules
+✔ 生成 dnsmasq 默认配置模板文件：dnsmasq.conf.add.tpl
+✔ 生成 dnsmasq 配置文件：dnsmasq.conf.add
+生成配置文件成功
+```
+
+此命令让 Unblock CHN 跳过配置路由器，仅提取 Unblock Youku 的规则，在 `unblockchn` 目录下生成相应的 ipset 和 dnsmasq 规则配置文件。
 
 #### 修改规则模板
 
