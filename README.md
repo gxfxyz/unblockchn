@@ -485,15 +485,17 @@ $ python3 unblockchn.py surge --ruleset
 
 1. Unblock Youku 的规则可能会失效，如果你遇到某个站点无法解锁，可以[向 Unblock Youku 反馈](https://bbs.uku.im)。
 
-2. 国内一些网站在海外可能会使用同一个 CDN 服务商，导致不同网站的域名会被解析为相同的 IP，由于 Unblock CHN 在路由器上实质是基于 IP 来分流的，因此可能会造成不需要代理回国的域名被误代理。目前，我发现微博图片的 `ws1.sinaimg.cn` 等域名和 B 站的 `data.bilibili.com` 域名有时会出现这种被解析到相同 IP 的情况，导致微博图片被误代理回国。临时解决办法是用 `renew` 命令来重置下 ipset，微博图片应该就能恢复直连，直到下一次访问 B 站。
+2. 因为 Unblock Youku 的规则主要是针对浏览器 Web 端，而一些手机端 App 有可能会采用不同的检测，所以可能需要手动添加一些额外规则才能解锁这些手机端 App。
 
-3. 更新 Unblock CHN：`git pull`
+3. 国内一些网站在海外可能会使用同一个 CDN 服务商，导致不同网站的域名会被解析为相同的 IP，由于 Unblock CHN 在路由器上实质是基于 IP 来分流的，因此可能会造成不需要代理回国的域名被误代理。目前，我发现微博图片的 `ws1.sinaimg.cn` 等域名和 B 站的 `data.bilibili.com` 域名有时会出现这种被解析到相同 IP 的情况，导致微博图片被误代理回国。临时解决办法是用 `renew` 命令来重置下 ipset，微博图片应该就能恢复直连，直到下一次访问 B 站。
 
-4. `default_config.py` 里有一些配置项，你可以将其复制为 `config.py` 后进行修改，`config.py` 内的配置会覆盖 `default_config.py` 内的配置。
+4. 更新 Unblock CHN：`git pull`
 
-5. 目录下的 `unblockchn.log` 为日志文件，记录了运行过的命令和结果。
+5. `default_config.py` 里有一些配置项，你可以将其复制为 `config.py` 后进行修改，`config.py` 内的配置会覆盖 `default_config.py` 内的配置。
 
-6. 本项目衍生自 Unblock Youku，如果你觉得本项目或 Unblock Youku 有用，请考虑[向 Unblock Youku  捐款](https://www.uku.im/) ❤️。
+6. 目录下的 `unblockchn.log` 为日志文件，记录了运行过的命令和结果。
+
+7. 本项目衍生自 Unblock Youku，如果你觉得本项目或 Unblock Youku 有用，请考虑[向 Unblock Youku  捐款](https://www.uku.im/) ❤️。
 
 ---
 
