@@ -130,6 +130,8 @@ Shadowsocks 加密方法：xxxxxxx
 ✔ 生成 dnsmasq 配置文件：dnsmasq.conf.add
 ✔ 复制：/tmp/mnt/sda1/unblockchn/ipset.rules -> /jffs/configs/ipset.rules
 ✔ 复制：/tmp/mnt/sda1/unblockchn/dnsmasq.conf.add -> /jffs/configs/dnsmasq.conf.add
+✔ 加载 xt_set 模块：modprobe xt_set
+✔ 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中：/jffs/scripts/services-start
 ✔ 载入 ipset 规则：ipset restore < /jffs/configs/ipset.rules
 ✔ 保存 ipset 载入命令到路由器的 nat-start 启动脚本中：/jffs/scripts/nat-start
 ✔ 添加 iptables 规则：iptables -t nat -A PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port 1080
@@ -212,6 +214,7 @@ $ python3 unblockchn.py router restore
 ✔ 从启动脚本里移除 ss-redir 启动命令：/jffs/scripts/services-start
 ✔ 删除：/jffs/configs/ipset.rules
 ✔ 删除：/jffs/configs/dnsmasq.conf.add
+✔ 从启动脚本里移除 xt_set 模块加载命令：/jffs/scripts/services-start
 ✔ 删除 iptables 规则：iptables -t nat -D PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port 1080
 ✔ 从启动脚本里移除 iptables 规则添加命令：/jffs/scripts/nat-start
 ✔ 删除 ipset 的 chn 表：ipset destroy chn

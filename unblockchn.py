@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
 import re
 import sys
 import time
@@ -265,6 +264,11 @@ Unblock CHN 还原路由器为未配置状态
                 os.remove(DNSMASQ_CONF_JFFS_PATH)
                 elogger.info("✔ 删除：{}".format(DNSMASQ_CONF_JFFS_PATH))
 
+        # 从启动脚本里移除 xt_set 模块加载命令
+        comment = "# Load xt_set module"
+        cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
+        elogger.info("✔ 从启动脚本里移除 xt_set 模块加载命令：{}".format(SERVICES_START_SCRIPT_PATH))
+
         # 删除 iptables 规则
         iptables_chn_exists = cls.check_iptables_chn()
         if iptables_chn_exists:
@@ -437,6 +441,16 @@ Unblock CHN 还原路由器为未配置状态
     @classmethod
     def setup_ipset_iptables(cls):
         """配置 ipset 和 iptables"""
+
+        # 加载 xt_set 模块
+        xt_set_cmd = "modprobe xt_set"
+        subprocess.check_call(xt_set_cmd, shell=True)
+        elogger.info("✔ 加载 xt_set 模块：{}".format(xt_set_cmd))
+
+        # 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中
+        comment = "# Load xt_set module"
+        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, xt_set_cmd)
+        elogger.info("✔ 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中：{}".format(SERVICES_START_SCRIPT_PATH))
 
         # 载入 ipset 规则
         ipset_cmd = "ipset restore < {}".format(IPSET_CONF_JFFS_PATH)
