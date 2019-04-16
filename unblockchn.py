@@ -727,7 +727,7 @@ Unblock CHN
         for url in urls:
             if url.startswith('http://'):  # http
                 reg_url = re.escape(url)
-                reg_url = reg_url.replace("\*", ".*")
+                reg_url = reg_url.replace("\\*", ".*")
                 reg_url = "^" + reg_url
                 rule = "URL-REGEX,{}"
                 rule = rule.format(reg_url)
