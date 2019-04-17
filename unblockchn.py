@@ -614,13 +614,16 @@ Unblock CHN 还原路由器为未配置状态
 
     @classmethod
     def get_ipset_names(cls):
-        ipset_names = []
-        with open(IPSET_CONF_JFFS_PATH, 'r', encoding='utf-8') as f:
+        ipset_names = {'chn'}
+        ipset_conf_path = os.path.join(DIR_PATH, "ipset.rules")
+        if not os.path.isfile(ipset_conf_path):
+            return ipset_names
+        with open(ipset_conf_path, 'r', encoding='utf-8') as f:
             for line in f:
                 if not line.startswith("create "):
                     continue
                 ipset_name = line.split(' ')[1]
-                ipset_names.append(ipset_name)
+                ipset_names.add(ipset_name)
         return ipset_names
 
     @classmethod
