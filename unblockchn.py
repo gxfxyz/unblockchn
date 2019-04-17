@@ -20,7 +20,6 @@ try:
 except ImportError:
     from default_config import *
 
-
 elogger = logging.getLogger('stderr')
 ologger = logging.getLogger('stdout')
 
@@ -244,28 +243,28 @@ Unblock CHN 还原路由器为未配置状态
 
         # 若 ipset 模板内有其它内容则生成对应配置文件并复制到 jffs
         # 否则就删除 jffs 中的配置文件
-        has_conf = cls.create_ipset_conf_file(ipset_rules=None)
-        if has_conf:
+        ipset_has_conf = cls.create_ipset_conf_file(ipset_rules=None)
+        if ipset_has_conf:
             cls.cp_ipset_conf_to_jffs()
         else:
             if os.path.isfile(IPSET_CONF_JFFS_PATH):
                 os.remove(IPSET_CONF_JFFS_PATH)
                 elogger.info("✔ 删除：{}".format(IPSET_CONF_JFFS_PATH))
 
+                # 从启动脚本里移除 ipset 载入命令
+                comment = "# Load ipset rules"
+                cls.remove_from_script(NAT_START_SCRIPT_PATH, comment)
+                elogger.info("✔ 从启动脚本里移除 ipset 载入命令：{}".format(NAT_START_SCRIPT_PATH))
+
         # 若 dnsmasq 模板内有其它内容则生成对应配置文件并复制到 jffs
         # 否则就删除 jffs 中的配置文件
-        has_conf = cls.create_dnsmasq_conf_file(dnsmasq_rules=None)
-        if has_conf:
+        dnsmasq_has_conf = cls.create_dnsmasq_conf_file(dnsmasq_rules=None)
+        if dnsmasq_has_conf:
             cls.cp_dnsmasq_conf_to_jffs()
         else:
             if os.path.isfile(DNSMASQ_CONF_JFFS_PATH):
                 os.remove(DNSMASQ_CONF_JFFS_PATH)
                 elogger.info("✔ 删除：{}".format(DNSMASQ_CONF_JFFS_PATH))
-
-        # 从启动脚本里移除 xt_set 模块加载命令
-        comment = "# Load xt_set module"
-        cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
-        elogger.info("✔ 从启动脚本里移除 xt_set 模块加载命令：{}".format(SERVICES_START_SCRIPT_PATH))
 
         # 删除 iptables 规则
         iptables_chn_exists = cls.check_iptables_chn()
@@ -278,13 +277,20 @@ Unblock CHN 还原路由器为未配置状态
         cls.remove_from_script(NAT_START_SCRIPT_PATH, comment)
         elogger.info("✔ 从启动脚本里移除 iptables 规则添加命令：{}".format(NAT_START_SCRIPT_PATH))
 
-        # 删除 chn 和其它自定义的 ipset 表
-        cls.destroy_ipset()
+        # 删除 ipset 的 chn 表
+        ipset_cmd = "ipset destroy chn"
+        try:
+            subprocess.check_output(ipset_cmd, shell=True, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            if "The set with the given name does not exist" not in str(e.stderr):
+                raise e
+        else:
+            elogger.info("✔ 删除 ipset 的 chn 表：{}".format(ipset_cmd))
 
-        # 从启动脚本里移除 ipset 载入命令
-        comment = "# Load ipset rules"
-        cls.remove_from_script(NAT_START_SCRIPT_PATH, comment)
-        elogger.info("✔ 从启动脚本里移除 ipset 载入命令：{}".format(NAT_START_SCRIPT_PATH))
+        # 从启动脚本里移除 xt_set 模块加载命令
+        comment = "# Load xt_set module"
+        cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
+        elogger.info("✔ 从启动脚本里移除 xt_set 模块加载命令：{}".format(SERVICES_START_SCRIPT_PATH))
 
         # 删除 nvram 中 unblockchn_on 变量
         cls.remove_nvram('unblockchn_on')
@@ -347,11 +353,11 @@ Unblock CHN 还原路由器为未配置状态
             return False
 
         if ipset_rules:
+            ipset_rules.insert(0, "create chn hash:ip family inet hashsize 1024 maxelem 65536")
             ipset_rules = "\n".join(ipset_rules)
         else:
             ipset_rules = ""
-        ipset_conf = "create chn hash:ip family inet hashsize 1024 maxelem 65536\n"
-        ipset_conf += ipset_tpl.format(rules=ipset_rules)
+        ipset_conf = ipset_tpl.format(rules=ipset_rules).strip()
 
         # 生成包含表创建命令的 ipset 规则配置文件 ipset.rules
         ipset_conf_path = os.path.join(DIR_PATH, "ipset.rules")
