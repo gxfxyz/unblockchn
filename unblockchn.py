@@ -170,10 +170,8 @@ Unblock CHN 路由器命令：
         cls.cp_ipset_conf_to_jffs()
         cls.cp_dnsmasq_conf_to_jffs()
 
-        # 清空 ipset 的 chn 表
-        cmd = "ipset flush chn"
-        subprocess.check_call(cmd, shell=True)
-        elogger.info("✔ 清空 ipset 的 chn 表：{}".format(cmd))
+        # 清空 chn 和其它自定义的 ipset 表
+        cls.flush_ipset()
 
         # 载入 ipset 规则
         headless_ipset_conf_path = os.path.join(DIR_PATH, "ipset.headless.rules")
@@ -280,15 +278,8 @@ Unblock CHN 还原路由器为未配置状态
         cls.remove_from_script(NAT_START_SCRIPT_PATH, comment)
         elogger.info("✔ 从启动脚本里移除 iptables 规则添加命令：{}".format(NAT_START_SCRIPT_PATH))
 
-        # 删除 ipset 的 chn 表
-        ipset_cmd = "ipset destroy chn"
-        try:
-            subprocess.check_output(ipset_cmd, shell=True, stderr=subprocess.PIPE)
-        except subprocess.CalledProcessError as e:
-            if "The set with the given name does not exist" not in str(e.stderr):
-                raise e
-        else:
-            elogger.info("✔ 删除 ipset 的 chn 表：{}".format(ipset_cmd))
+        # 删除 chn 和其它自定义的 ipset 表
+        cls.destroy_ipset()
 
         # 从启动脚本里移除 ipset 载入命令
         comment = "# Load ipset rules"
@@ -359,18 +350,20 @@ Unblock CHN 还原路由器为未配置状态
             ipset_rules = "\n".join(ipset_rules)
         else:
             ipset_rules = ""
-        ipset_conf = ipset_tpl.format(rules=ipset_rules)
+        ipset_conf = "create chn hash:ip family inet hashsize 1024 maxelem 65536\n"
+        ipset_conf += ipset_tpl.format(rules=ipset_rules)
 
         # 生成包含表创建命令的 ipset 规则配置文件 ipset.rules
         ipset_conf_path = os.path.join(DIR_PATH, "ipset.rules")
         with open(ipset_conf_path, 'w', encoding='utf-8') as f:
-            f.write("create chn hash:ip family inet hashsize 1024 maxelem 65536\n")
             f.write(ipset_conf)
 
         # 生成不包含表创建命令的 ipset 规则配置文件 ipset.headless.rules
+        lines = ipset_conf.split('\n')
+        lines = [line for line in lines if not line.startswith("create ")]
         headless_ipset_conf_path = os.path.join(DIR_PATH, "ipset.headless.rules")
         with open(headless_ipset_conf_path, 'w', encoding='utf-8') as f:
-            f.write(ipset_conf)
+            f.write("\n".join(lines))
 
         elogger.info("✔ 生成 ipset 配置文件：ipset.rules & ipset.headless.rules")
         return True
@@ -593,6 +586,42 @@ Unblock CHN 还原路由器为未配置状态
         returncode = subprocess.call(
             cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return returncode == 0
+
+    @classmethod
+    def flush_ipset(cls):
+        """清空 chn 和其它自定义的 ipset 表"""
+        ipset_names = cls.get_ipset_names()
+
+        for ipset_name in ipset_names:
+            cmd = "ipset flush {}".format(ipset_name)
+            subprocess.check_call(cmd, shell=True)
+            elogger.info("✔ 清空 ipset 的 {} 表：{}".format(ipset_name, cmd))
+
+    @classmethod
+    def destroy_ipset(cls):
+        """删除 chn 和其它自定义的 ipset 表"""
+        ipset_names = cls.get_ipset_names()
+
+        for ipset_name in ipset_names:
+            cmd = "ipset destroy {}".format(ipset_name)
+            try:
+                subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE)
+            except subprocess.CalledProcessError as e:
+                if "The set with the given name does not exist" not in str(e.stderr):
+                    raise e
+            else:
+                elogger.info("✔ 删除 ipset 的 {} 表：{}".format(ipset_name, cmd))
+
+    @classmethod
+    def get_ipset_names(cls):
+        ipset_names = []
+        with open(IPSET_CONF_JFFS_PATH, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.startswith("create "):
+                    continue
+                ipset_name = line.split(' ')[1]
+                ipset_names.append(ipset_name)
+        return ipset_names
 
     @classmethod
     def add_iptables_chn(cls):
