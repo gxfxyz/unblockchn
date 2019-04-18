@@ -438,9 +438,9 @@ http://uku.im/check
 你可以添加 `-d` 参数，让 Unblock CHN 在生成配置文件后，将其复制到另外一个文件夹，例如 iCloud Drive 或其它网盘文件夹，这样可以方便在手机上更新配置文件：
 
 ```console
-$ python3 unblockchn.py surge -d ~/Library/Mobile\ Documents/iCloud~run~surge/Documents
+$ python3 unblockchn.py surge -d ~/Library/Mobile\ Documents/iCloud~com~nssurge~inc/Documents
 ✔ 生成 Surge 配置文件（surge 目录）：surge.conf
-✔ 保存 Surge 配置文件到：/Users/User/Library/Mobile Documents/iCloud~run~surge/Documents/surge.conf
+✔ 保存 Surge 配置文件到：/Users/User/Library/Mobile Documents/iCloud~com~nssurge~inc/Documents/surge.conf
 ```
 
 #### 生成基于 URL 正则表达式的规则
