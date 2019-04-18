@@ -121,15 +121,15 @@ Shadowsocks 服务器地址：xxx.xxx.xxx.xxx
 Shadowsocks 服务器端口：xxxx
 Shadowsocks 密码：xxxxxxxxxx
 Shadowsocks 加密方法：xxxxxxx
-✔ 保存 ss-redir 配置文件：/tmp/mnt/sda1/unblockchn/ss-redir.json
-✔ 启动 ss-redir：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/ss-redir.json -f /tmp/mnt/sda1/unblockchn/ss-redir.pid
+✔ 保存 ss-redir 配置文件：/tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.json
+✔ 启动 ss-redir：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.json -f /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.pid
 ✔ 保存 ss-redir 启动命令到路由器的 services-start 启动脚本中：/jffs/scripts/services-start
-✔ 生成 ipset 默认配置模板文件：ipset.rules.tpl
-✔ 生成 ipset 配置文件：ipset.rules & ipset.headless.rules
-✔ 生成 dnsmasq 默认配置模板文件：dnsmasq.conf.add.tpl
-✔ 生成 dnsmasq 配置文件：dnsmasq.conf.add
-✔ 复制：/tmp/mnt/sda1/unblockchn/ipset.rules -> /jffs/configs/ipset.rules
-✔ 复制：/tmp/mnt/sda1/unblockchn/dnsmasq.conf.add -> /jffs/configs/dnsmasq.conf.add
+✔ 生成 ipset 默认配置模板文件（configs 目录）：ipset.rules.tpl
+✔ 生成 ipset 配置文件（configs 目录）：ipset.rules & ipset.headless.rules
+✔ 生成 dnsmasq 默认配置模板文件（configs 目录）：dnsmasq.conf.add.tpl
+✔ 生成 dnsmasq 配置文件（configs 目录）：dnsmasq.conf.add
+✔ 复制：/tmp/mnt/sda1/unblockchn/configs/ipset.rules -> /jffs/configs/ipset.rules
+✔ 复制：/tmp/mnt/sda1/unblockchn/configs/dnsmasq.conf.add -> /jffs/configs/dnsmasq.conf.add
 ✔ 加载 xt_set 模块：modprobe xt_set
 ✔ 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中：/jffs/scripts/services-start
 ✔ 载入 ipset 规则：ipset restore < /jffs/configs/ipset.rules
@@ -194,12 +194,12 @@ $ python3 unblockchn.py router check 192.168.2.1
 
 ```console
 $ python3 unblockchn.py router renew
-✔ 生成 ipset 配置文件：ipset.rules & ipset.headless.rules
-✔ 生成 dnsmasq 配置文件：dnsmasq.conf.add
-✔ 复制：/tmp/mnt/sda1/unblockchn/ipset.rules -> /jffs/configs/ipset.rules
-✔ 复制：/tmp/mnt/sda1/unblockchn/dnsmasq.conf.add -> /jffs/configs/dnsmasq.conf.add
+✔ 生成 ipset 配置文件（configs 目录）：ipset.rules & ipset.headless.rules
+✔ 生成 dnsmasq 配置文件（configs 目录）：dnsmasq.conf.add
+✔ 复制：/tmp/mnt/sda1/unblockchn/configs/ipset.rules -> /jffs/configs/ipset.rules
+✔ 复制：/tmp/mnt/sda1/unblockchn/configs/dnsmasq.conf.add -> /jffs/configs/dnsmasq.conf.add
 ✔ 清空 ipset 的 chn 表：ipset flush chn
-✔ 载入 ipset 规则：ipset restore < /tmp/mnt/sda1/unblockchn/ipset.headless.rules
+✔ 载入 ipset 规则：ipset restore < /tmp/mnt/sda1/unblockchn/configs/ipset.headless.rules
 ✔ 重启 dnsmasq：service restart_dnsmasq
 更新成功
 ```
@@ -210,15 +210,15 @@ Unblock CHN 在路由器上默认定时每日 03:00 自动更新分流规则，�
 
 ```console
 $ python3 unblockchn.py router restore
-✔ 停止 ss-redir：kill 3002
+✔ 停止 ss-redir：kill 17981
 ✔ 从启动脚本里移除 ss-redir 启动命令：/jffs/scripts/services-start
 ✔ 删除：/jffs/configs/ipset.rules
+✔ 从启动脚本里移除 ipset 载入命令：/jffs/scripts/nat-start
 ✔ 删除：/jffs/configs/dnsmasq.conf.add
-✔ 从启动脚本里移除 xt_set 模块加载命令：/jffs/scripts/services-start
 ✔ 删除 iptables 规则：iptables -t nat -D PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port 1080
 ✔ 从启动脚本里移除 iptables 规则添加命令：/jffs/scripts/nat-start
 ✔ 删除 ipset 的 chn 表：ipset destroy chn
-✔ 从启动脚本里移除 ipset 载入命令：/jffs/scripts/nat-start
+✔ 从启动脚本里移除 xt_set 模块加载命令：/jffs/scripts/services-start
 ✔ 删除每日更新规则的 cron 定时任务：cru d unblockchn_renew
 ✔ 从启动脚本里移除定时命令：/jffs/scripts/services-start
 ✔ 重启 dnsmasq：service restart_dnsmasq
@@ -235,18 +235,18 @@ $ python3 unblockchn.py router restore --no-ss
 
 ```console
 $ python3 unblockchn.py router create
-✔ 生成 ipset 默认配置模板文件：ipset.rules.tpl
-✔ 生成 ipset 配置文件：ipset.rules & ipset.headless.rules
-✔ 生成 dnsmasq 默认配置模板文件：dnsmasq.conf.add.tpl
-✔ 生成 dnsmasq 配置文件：dnsmasq.conf.add
+✔ 生成 ipset 默认配置模板文件（configs 目录）：ipset.rules.tpl
+✔ 生成 ipset 配置文件（configs 目录）：ipset.rules & ipset.headless.rules
+✔ 生成 dnsmasq 默认配置模板文件（configs 目录）：dnsmasq.conf.add.tpl
+✔ 生成 dnsmasq 配置文件（configs 目录）：dnsmasq.conf.add
 生成配置文件成功
 ```
 
-此命令让 Unblock CHN 跳过配置路由器，仅提取 Unblock Youku 的规则，在 `unblockchn` 目录下生成相应的 ipset 和 dnsmasq 规则配置文件。
+此命令让 Unblock CHN 跳过配置路由器，仅提取 Unblock Youku 的规则，在 `configs` 子目录下生成相应的 ipset 和 dnsmasq 规则配置文件。
 
 #### 修改规则模板
 
-除了 Unblock CHN 自动生成的规则以外，如果你需要自定义一些 dnsmasq 或 ipset 规则，可以通过修改 `unblockchn` 目录下的规则模板文件 `dnsmasq.conf.add.tpl` 和 `ipset.rules.tpl` 来实现。
+除了 Unblock CHN 自动生成的规则以外，如果你需要自定义一些 dnsmasq 或 ipset 规则，可以通过修改 `configs` 子目录下的规则模板文件 `dnsmasq.conf.add.tpl` 和 `ipset.rules.tpl` 来实现。
 
 保留模板文件中的 `{rules}` 一行，其在生成规则时会被 Unblock CHN 规则替换，然后在模板文件中添加你需要的规则，例如：
 
@@ -412,7 +412,7 @@ optional arguments:
 
 #### 准备模板
 
-Unblock CHN 生成配置时，会在 `unblockchn` 目录下查找 `.conf.tpl` 后缀的 Surge 配置模板文件，因此你需要先准备至少一个模板文件。
+Unblock CHN 生成配置时，会在 `surge` 子目录下查找 `.conf.tpl` 后缀的 Surge 配置模板文件，因此你需要先准备至少一个模板文件。
 
 复制样例模板文件 `sample_surge.conf.tpl`，重命名为例如 `surge.conf.tpl`。
 
@@ -424,10 +424,10 @@ Unblock CHN 生成配置时，会在 `unblockchn` 目录下查找 `.conf.tpl` �
 
 ```console
 $ python3 unblockchn.py surge
-✔ 生成 Surge 配置文件：surge.conf
+✔ 生成 Surge 配置文件（surge 目录）：surge.conf
 ```
 
-Unblock CHN 就会在目录下生成模板文件 `surge.conf.tpl` 对应的 Surge 配置文件 `surge.conf`。
+Unblock CHN 就会在 `surge` 子目录下生成模板文件 `surge.conf.tpl` 对应的 Surge 配置文件 `surge.conf`。
 
 Surge 或 Shadowrocket 载入配置文件后，可以访问下列地址以验证回国代理是否成功，如果显示 `true`，就说明回国代理已生效： 
 
@@ -439,7 +439,7 @@ http://uku.im/check
 
 ```console
 $ python3 unblockchn.py surge -d ~/Library/Mobile\ Documents/iCloud~run~surge/Documents
-✔ 生成 Surge 配置文件：surge.conf
+✔ 生成 Surge 配置文件（surge 目录）：surge.conf
 ✔ 保存 Surge 配置文件到：/Users/User/Library/Mobile Documents/iCloud~run~surge/Documents/surge.conf
 ```
 
@@ -477,7 +477,7 @@ URL 规则的好处是匹配更准确，站点一般只通过几个特定 URL �
 
 ```console
 $ python3 unblockchn.py surge --ruleset
-✔ 生成 Surge ruleset 文件：unblockchn.surge.ruleset
+✔ 生成 Surge ruleset 文件（surge 目录）：unblockchn.surge.ruleset
 ```
 
 [RULESET 文件的使用](#ruleset-%E6%96%87%E4%BB%B6)
@@ -492,7 +492,13 @@ $ python3 unblockchn.py surge --ruleset
 
 3. 国内一些网站在海外可能会使用同一个 CDN 服务商，导致不同网站的域名会被解析为相同的 IP，由于 Unblock CHN 在路由器上实质是基于 IP 来分流的，因此可能会造成不需要代理回国的域名被误代理。目前，我发现微博图片的 `ws1.sinaimg.cn` 等域名和 B 站的 `data.bilibili.com` 域名有时会出现这种被解析到相同 IP 的情况，导致微博图片被误代理回国。临时解决办法是用 `renew` 命令来重置下 ipset，微博图片应该就能恢复直连，直到下一次访问 B 站。
 
-4. 更新 Unblock CHN：`git pull`
+4. 更新 Unblock CHN：
+
+   1. 更新前还原路由器为未配置状态：`python3 unblockchn.py router restore`
+
+   2. 更新：`git pull`
+   
+   3. 更新后重新配置路由器：`python3 unblockchn.py router setup`
 
 5. `default_config.py` 里有一些配置项，你可以将其复制为 `config.py` 后进行修改，`config.py` 内的配置会覆盖 `default_config.py` 内的配置。
 

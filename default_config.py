@@ -6,6 +6,12 @@ import os
 
 # unblockchn 目录路径
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+# configs 子目录路径
+CONFIGS_DIR_PATH = os.path.join(DIR_PATH, "configs")
+# surge 子目录路径
+SURGE_DIR_PATH = os.path.join(DIR_PATH, "surge")
+# shadowsocks 子目录路径
+SHADOWSOCKS_DIR_PATH = os.path.join(DIR_PATH, "shadowsocks")
 
 # Unblock Youku 的规则文件 urls.js 链接
 UNBLOCK_YOUKU_URLSJS_URL = "https://raw.githubusercontent.com/uku/Unblock-Youku/master/shared/urls.js"
@@ -19,9 +25,9 @@ PYTHON3_PATH = "/opt/bin/python3"
 # ss_redir 命令路径
 SS_REDIR_PATH = "/opt/bin/ss-redir"
 # ss_redir 配置文件路径
-SS_REDIR_CONF_PATH = os.path.join(DIR_PATH, "ss-redir.json")
+SS_REDIR_CONF_PATH = os.path.join(SHADOWSOCKS_DIR_PATH, "ss-redir.json")
 # ss_redir pid 文件路径
-SS_REDIR_PID_PATH = os.path.join(DIR_PATH, "ss-redir.pid")
+SS_REDIR_PID_PATH = os.path.join(SHADOWSOCKS_DIR_PATH, "ss-redir.pid")
 # ss_redir 本地端口
 SS_REDIR_LOCAL_PORT = 1080
 # ss_redir 配置

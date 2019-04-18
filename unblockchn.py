@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import re
 import sys
 import time
@@ -33,6 +34,9 @@ Unblock CHN 命令：
 """
     elogger.debug("")
     elogger.debug(" ".join(sys.argv))
+
+    # 整理一些文件到相应的子目录中（为了向后兼容）
+    organize()
 
     parser = argparse.ArgumentParser(usage=main.__doc__)
     parser.add_argument('cmd', choices=['router', 'surge'])
@@ -173,7 +177,7 @@ Unblock CHN 路由器命令：
         cls.flush_ipset()
 
         # 载入 ipset 规则
-        headless_ipset_conf_path = os.path.join(DIR_PATH, "ipset.headless.rules")
+        headless_ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.headless.rules")
         cmd = "ipset restore < {}".format(headless_ipset_conf_path)
         subprocess.check_call(cmd, shell=True)
         elogger.info("✔ 载入 ipset 规则：{}".format(cmd))
@@ -338,7 +342,7 @@ Unblock CHN 还原路由器为未配置状态
     @classmethod
     def create_ipset_conf_file(cls, ipset_rules):
         """从模板生成 ipset 规则配置文件 ipset.rules"""
-        ipset_tpl_path = os.path.join(DIR_PATH, "ipset.rules.tpl")
+        ipset_tpl_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules.tpl")
         if os.path.isfile(ipset_tpl_path):
             with open(ipset_tpl_path, 'r', encoding='utf-8') as f:
                 ipset_tpl = f.read()
@@ -346,7 +350,7 @@ Unblock CHN 还原路由器为未配置状态
             ipset_tpl = "{rules}"
             with open(ipset_tpl_path, 'w', encoding='utf-8') as f:
                 f.write(ipset_tpl)
-            elogger.info("✔ 生成 ipset 默认配置模板文件：ipset.rules.tpl")
+            elogger.info("✔ 生成 ipset 默认配置模板文件（configs 目录）：ipset.rules.tpl")
 
         # 无 ipset 规则 & 无自定义模板内容
         if (not ipset_rules) and (ipset_tpl == "{rules}"):
@@ -360,24 +364,24 @@ Unblock CHN 还原路由器为未配置状态
         ipset_conf = ipset_tpl.format(rules=ipset_rules).strip()
 
         # 生成包含表创建命令的 ipset 规则配置文件 ipset.rules
-        ipset_conf_path = os.path.join(DIR_PATH, "ipset.rules")
+        ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules")
         with open(ipset_conf_path, 'w', encoding='utf-8') as f:
             f.write(ipset_conf)
 
         # 生成不包含表创建命令的 ipset 规则配置文件 ipset.headless.rules
         lines = ipset_conf.split('\n')
         lines = [line for line in lines if not line.startswith("create ")]
-        headless_ipset_conf_path = os.path.join(DIR_PATH, "ipset.headless.rules")
+        headless_ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.headless.rules")
         with open(headless_ipset_conf_path, 'w', encoding='utf-8') as f:
             f.write("\n".join(lines))
 
-        elogger.info("✔ 生成 ipset 配置文件：ipset.rules & ipset.headless.rules")
+        elogger.info("✔ 生成 ipset 配置文件（configs 目录）：ipset.rules & ipset.headless.rules")
         return True
 
     @classmethod
     def create_dnsmasq_conf_file(cls, dnsmasq_rules):
         """从模板生成 dnsmasq 规则配置文件 dnsmasq.conf.add"""
-        dnsmasq_tpl_path = os.path.join(DIR_PATH, "dnsmasq.conf.add.tpl")
+        dnsmasq_tpl_path = os.path.join(CONFIGS_DIR_PATH, "dnsmasq.conf.add.tpl")
         if os.path.isfile(dnsmasq_tpl_path):
             with open(dnsmasq_tpl_path, 'r', encoding='utf-8') as f:
                 dnsmasq_tpl = f.read()
@@ -385,7 +389,7 @@ Unblock CHN 还原路由器为未配置状态
             dnsmasq_tpl = "{rules}"
             with open(dnsmasq_tpl_path, 'w', encoding='utf-8') as f:
                 f.write(dnsmasq_tpl)
-            elogger.info("✔ 生成 dnsmasq 默认配置模板文件：dnsmasq.conf.add.tpl")
+            elogger.info("✔ 生成 dnsmasq 默认配置模板文件（configs 目录）：dnsmasq.conf.add.tpl")
 
         # 无 dnsmasq 规则 & 无自定义模板内容
         if (not dnsmasq_rules) and (dnsmasq_tpl == "{rules}"):
@@ -398,11 +402,11 @@ Unblock CHN 还原路由器为未配置状态
             dnsmasq_rules = ""
         dnsmasq_conf = dnsmasq_tpl.format(rules=dnsmasq_rules)
 
-        dnsmasq_conf_path = os.path.join(DIR_PATH, "dnsmasq.conf.add")
+        dnsmasq_conf_path = os.path.join(CONFIGS_DIR_PATH, "dnsmasq.conf.add")
         with open(dnsmasq_conf_path, 'w', encoding='utf-8') as f:
             f.write(dnsmasq_conf)
 
-        elogger.info("✔ 生成 dnsmasq 配置文件：dnsmasq.conf.add")
+        elogger.info("✔ 生成 dnsmasq 配置文件（configs 目录）：dnsmasq.conf.add")
         return True
 
     @classmethod
@@ -549,7 +553,7 @@ Unblock CHN 还原路由器为未配置状态
     @classmethod
     def cp_ipset_conf_to_jffs(cls):
         """复制 ipset 规则配置文件到 jffs 配置目录"""
-        ipset_conf_path = os.path.join(DIR_PATH, "ipset.rules")
+        ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules")
         if os.path.isfile(ipset_conf_path):
             shutil.copy2(ipset_conf_path, IPSET_CONF_JFFS_PATH)
             elogger.info("✔ 复制：{} -> {}".format(ipset_conf_path, IPSET_CONF_JFFS_PATH))
@@ -559,7 +563,7 @@ Unblock CHN 还原路由器为未配置状态
     @classmethod
     def cp_dnsmasq_conf_to_jffs(cls):
         """复制 dnsmasq 规则配置文件到 jffs 配置目录"""
-        dnsmasq_conf_path = os.path.join(DIR_PATH, "dnsmasq.conf.add")
+        dnsmasq_conf_path = os.path.join(CONFIGS_DIR_PATH, "dnsmasq.conf.add")
         if os.path.isfile(dnsmasq_conf_path):
             shutil.copy2(dnsmasq_conf_path, DNSMASQ_CONF_JFFS_PATH)
             elogger.info("✔ 复制：{} -> {}".format(dnsmasq_conf_path, DNSMASQ_CONF_JFFS_PATH))
@@ -621,7 +625,7 @@ Unblock CHN 还原路由器为未配置状态
     @classmethod
     def get_ipset_names(cls):
         ipset_names = {'chn'}
-        ipset_conf_path = os.path.join(DIR_PATH, "ipset.rules")
+        ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules")
         if not os.path.isfile(ipset_conf_path):
             return ipset_names
         with open(ipset_conf_path, 'r', encoding='utf-8') as f:
@@ -823,21 +827,21 @@ Unblock CHN
 
         has_conf = False
 
-        for name in os.listdir(DIR_PATH):
+        for name in os.listdir(SURGE_DIR_PATH):
             if not name.endswith(".conf.tpl"):
                 continue
             if name == "sample_surge.conf.tpl":  # 跳过样例模板
                 continue
-            tpl_path = os.path.join(DIR_PATH, name)
+            tpl_path = os.path.join(SURGE_DIR_PATH, name)
             with open(tpl_path, 'r', encoding='utf-8') as f:
                 tpl = f.read()
             conf_name = name[:-4]
-            conf_path = os.path.join(DIR_PATH, conf_name)
+            conf_path = os.path.join(SURGE_DIR_PATH, conf_name)
             conf = tpl.format(rules=rules)
             with open(conf_path, 'w', encoding='utf-8') as f:
                 f.write(conf)
             has_conf = True
-            elogger.info("✔ 生成 Surge 配置文件：{}".format(conf_name))
+            elogger.info("✔ 生成 Surge 配置文件（surge 目录）：{}".format(conf_name))
 
         return has_conf
 
@@ -845,18 +849,18 @@ Unblock CHN
     def create_ruleset_file(cls, rules):
         """生成 Surge ruleset 文件"""
         rules = "\n".join(rules['black'])
-        ruleset_file_path = os.path.join(DIR_PATH, "unblockchn.surge.ruleset")
+        ruleset_file_path = os.path.join(SURGE_DIR_PATH, "unblockchn.surge.ruleset")
         with open(ruleset_file_path, 'w', encoding='utf-8') as f:
             f.write(rules)
-        elogger.info("✔ 生成 Surge ruleset 文件：unblockchn.surge.ruleset")
+        elogger.info("✔ 生成 Surge ruleset 文件（surge 目录）：unblockchn.surge.ruleset")
 
     @classmethod
     def cp_conf_files(cls, dst):
         """复制目录下的 Surge 配置文件到 dst 文件夹"""
-        for name in os.listdir(DIR_PATH):
+        for name in os.listdir(SURGE_DIR_PATH):
             if not name.endswith('.conf'):
                 continue
-            src_path = os.path.join(DIR_PATH, name)
+            src_path = os.path.join(SURGE_DIR_PATH, name)
             dst_path = os.path.join(dst, name)
             shutil.copy2(src_path, dst_path)
             elogger.info("✔ 保存 Surge 配置文件到：{}".format(dst_path))
@@ -865,7 +869,7 @@ Unblock CHN
     def cp_ruleset_file(cls, dst):
         """复制目录下的 Surge ruleset 文件到 dst 文件夹"""
         name = "unblockchn.surge.ruleset"
-        src_path = os.path.join(DIR_PATH, name)
+        src_path = os.path.join(SURGE_DIR_PATH, name)
         dst_path = os.path.join(dst, name)
         shutil.copy2(src_path, dst_path)
         elogger.info("✔ 保存 Surge ruleset 文件到：{}".format(dst_path))
@@ -958,6 +962,46 @@ class UnblockYouku(object):
         s = re.sub(r",\s*\]", "\n]", s)  # 去除跟在最后一个元素后面的逗号
         urls = json.loads(s)
         return urls
+
+
+def organize():
+    """整理一些文件到相应的子目录中（为了向后兼容）"""
+    ensure_dir(CONFIGS_DIR_PATH)
+    ensure_dir(SURGE_DIR_PATH)
+    ensure_dir(SHADOWSOCKS_DIR_PATH)
+    config_filenames = [
+        "ipset.rules", "ipset.headless.rules", "ipset.rules.tpl",
+        "dnsmasq.conf.add", "dnsmasq.conf.add.tpl",
+    ]
+    shadowsocks_filenames = [
+        "ss-redir.json",
+        "ss-redir.pid",
+    ]
+    for name in os.listdir(DIR_PATH):
+        if name in config_filenames:
+            old_path = os.path.join(DIR_PATH, name)
+            new_path = os.path.join(CONFIGS_DIR_PATH, name)
+            shutil.move(old_path, new_path)
+            continue
+        if name.endswith(".conf") or name.endswith(".conf.tpl") or name.endswith(".ruleset"):
+            old_path = os.path.join(DIR_PATH, name)
+            new_path = os.path.join(SURGE_DIR_PATH, name)
+            shutil.move(old_path, new_path)
+            continue
+        if name in shadowsocks_filenames:
+            old_path = os.path.join(DIR_PATH, name)
+            new_path = os.path.join(SHADOWSOCKS_DIR_PATH, name)
+            shutil.copy2(old_path, new_path)
+            continue
+
+
+def ensure_dir(dir_path):
+    """若 dir_path 目录不存在则创建它"""
+    if not os.path.isdir(dir_path):
+        try:
+            os.makedirs(dir_path)
+        except OSError:
+            pass
 
 
 def init_logging():

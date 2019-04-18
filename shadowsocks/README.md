@@ -1,0 +1,1 @@
+此目录用来存放 Shadowsocks (ss-redir) 配置文件等相关文件。
