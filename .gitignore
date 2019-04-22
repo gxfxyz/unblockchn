@@ -4,7 +4,7 @@
 ipset.rules
 ipset.headless.rules
 dnsmasq.conf.add
-ss-redir.json
+*.json
 ss-redir.pid
 unblockchn.log
 unblockchn.surge.ruleset
