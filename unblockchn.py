@@ -13,6 +13,7 @@ import argparse
 import subprocess
 import logging.handlers
 from urllib.parse import urlsplit
+from collections import OrderedDict
 
 import requests
 
@@ -20,6 +21,7 @@ try:
     from config import *
 except ImportError:
     from default_config import *
+
 
 elogger = logging.getLogger('stderr')
 ologger = logging.getLogger('stdout')
@@ -52,21 +54,25 @@ class Router(object):
 
     @classmethod
     def execute(cls, raw_args):
-        """python3 unblockchn.py router [-h] {status,on,off,check,renew,setup,restore,create}
+        """python3 unblockchn.py router [-h] {status,on,off,servers,switch,check,renew,setup,restore,create}
 
 Unblock CHN 路由器命令：
-  status                  查看代理状态
-  on                      开启代理
-  off                     关闭代理
-  check <URL/IP/域名>     检查 <URL/IP/域名> 是否走代理
-  renew                   更新规则
-  setup [--no-ss]         一键配置路由器 [--no-ss: 跳过配置 ss-redir]
-  restore [--no-ss]       还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
-  create                  仅生成 ipset 和 dnsmasq 规则配置文件
+  status                    查看代理状态
+  on                        开启代理
+  off                       关闭代理
+  servers [--json]          列出代理服务器 [--json: 输出 json 格式]
+  switch [name] [--auto]    切换代理服务器 [--auto: 自动选择延迟最低的代理服务器]
+  check <URL/IP/域名>       检查 <URL/IP/域名> 是否走代理
+  renew                     更新规则
+  setup [--no-ss]           一键配置路由器 [--no-ss: 跳过配置 ss-redir]
+  restore [--no-ss]         还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
+  create                    仅生成 ipset 和 dnsmasq 规则配置文件
 """
         parser = argparse.ArgumentParser(usage=cls.execute.__doc__)
         parser.add_argument(
-            'cmd', choices=['status', 'on', 'off', 'check', 'renew', 'setup', 'restore', 'create'])
+            'cmd',
+            choices=['status', 'on', 'off', 'servers', 'switch', 'check', 'renew', 'setup', 'restore', 'create']
+        )
         args = parser.parse_args(raw_args[0:1])
 
         if args.cmd == 'create':
@@ -76,12 +82,16 @@ Unblock CHN 路由器命令：
         # 检查 iptables 和 ipset 命令是否存在
         cls.check_ipset_iptables()
 
-        if args.cmd == 'on':
+        if args.cmd == 'status':
+            cls.cmd_status()
+        elif args.cmd == 'on':
             cls.cmd_on()
         elif args.cmd == 'off':
             cls.cmd_off()
-        elif args.cmd == 'status':
-            cls.cmd_status()
+        elif args.cmd == 'servers':
+            cls.cmd_servers(raw_args[1:])
+        elif args.cmd == 'switch':
+            cls.cmd_switch(raw_args[1:])
         elif args.cmd == 'check':
             cls.cmd_check(raw_args[1:])
         elif args.cmd == 'renew':
@@ -95,9 +105,14 @@ Unblock CHN 路由器命令：
     def cmd_status(cls):
         """查看 Unblock CHN 代理状态"""
         cls.check_setup()
+        ss_redir_running = cls.check_ss_redir()
+        if not ss_redir_running:
+            ologger.info("ss-redir 未运行")
+            return
         iptables_chn_exists = cls.check_iptables_chn()
         if iptables_chn_exists:
-            ologger.info("已开启")
+            ss_redir_conf_name = cls.get_nvram("unblockchn_ss_conf")
+            ologger.info(f"已开启 ({ss_redir_conf_name})")
         else:
             ologger.info("已关闭")
 
@@ -107,17 +122,15 @@ Unblock CHN 路由器命令：
         cls.check_setup()
         ss_redir_running = cls.check_ss_redir()
         if not ss_redir_running:
-            success = cls.start_ss_redir()
-            if not success:
-                ologger.error("✘ 无法启动 ss-redir")
-                sys.exit(1)
+            cls.start_ss_redir()
         iptables_chn_exists = cls.check_iptables_chn()
         if not iptables_chn_exists:
             cls.add_iptables_chn()
+        ss_redir_conf_name = cls.get_nvram("unblockchn_ss_conf")
         if ss_redir_running and iptables_chn_exists:
-            ologger.info("已经开启")
+            ologger.info(f"已经开启 ({ss_redir_conf_name})")
         else:
-            ologger.info("开启成功")
+            ologger.info(f"开启成功 ({ss_redir_conf_name})")
         # 记录开启状态到 nvram 变量
         cls.set_nvram('unblockchn_on', "True")
 
@@ -133,6 +146,114 @@ Unblock CHN 路由器命令：
             ologger.info("已经关闭")
         # 记录关闭状态到 nvram 变量
         cls.set_nvram('unblockchn_on', "False")
+
+    @classmethod
+    def cmd_servers(cls, raw_args):
+        """python3 unblockchn.py router servers [-h] [--json]
+
+列出代理服务器
+"""
+        parser = argparse.ArgumentParser(usage=cls.cmd_servers.__doc__)
+        parser.add_argument('-j', '--json', action='store_true', help="输出 json 格式")
+        args = parser.parse_args(raw_args)
+
+        # 读取代理服务器（配置文件）
+        confs = cls.load_ss_redir_confs()
+
+        # 标记目前使用的代理服务器
+        ss_redir_conf_name = cls.get_nvram("unblockchn_ss_conf")
+        if ss_redir_conf_name:
+            if ss_redir_conf_name in confs:
+                confs[ss_redir_conf_name]['selected'] = True
+
+        # 输出 json 格式
+        if args.json:
+            json_str = json.dumps(confs, ensure_ascii=False, indent=4)
+            ologger.info(json_str)
+            return
+
+        if not confs:
+            ologger.info("未配置任何代理服务器")
+            return
+
+        ologger.info(f"共有 {len(confs)} 个代理服务器：")
+
+        for i, conf_name in enumerate(confs):
+            conf = confs[conf_name]
+            ologger.info(f"{i + 1}) {conf_name}")
+            ologger.info(f"Shadowsocks 服务器地址：{conf['server']}")
+            ologger.info(f"Shadowsocks 服务器端口：{conf['server_port']}")
+            ologger.info(f"Shadowsocks 密码：{conf['password']}")
+            ologger.info(f"Shadowsocks 加密方法：{conf['method']}")
+
+        if ss_redir_conf_name:
+            ologger.info("-")
+            ologger.info(f"目前使用的代理服务器为：{ss_redir_conf_name}")
+
+    @classmethod
+    def cmd_switch(cls, raw_args):
+        """python3 unblockchn.py router switch [-h] [name] [--auto]
+
+切换代理服务器
+"""
+        parser = argparse.ArgumentParser(usage=cls.cmd_switch.__doc__)
+        parser.add_argument('name', nargs='?', help="代理服务器名")
+        parser.add_argument('-a', '--auto', action='store_true', help="自动选择延迟最低的代理服务器")
+        args = parser.parse_args(raw_args)
+
+        # 读取代理服务器（配置文件）
+        confs = cls.load_ss_redir_confs()
+
+        if not confs:
+            ologger.error("✘ 未配置任何代理服务器")
+            sys.exit(1)
+
+        if args.auto:
+            selected_conf_name = cls.auto_select(confs)
+        else:
+            if args.name:
+                selected_conf_name = args.name
+            else:
+                # 手动选择代理服务器（配置文件）
+                elogger.info("0) 自动选择延迟最低的代理服务器")
+                for i, conf_name in enumerate(confs):
+                    conf = confs[conf_name]
+                    hostname = conf['server']
+                    port = conf['server_port']
+                    elogger.info(f"{i + 1}) {conf_name} [{hostname}:{port}]")
+                r = input(f"请选择要使用的代理服务器 [0-{len(confs)}]：") or "0"
+                try:
+                    n = int(r)
+                except ValueError:
+                    elogger.error(f"✘ 无效输入：{r}")
+                    sys.exit(1)
+                if n > len(confs) or n < 0:
+                    elogger.error(f"✘ 无效输入：{r}")
+                    sys.exit(1)
+                if n == 0:
+                    # 自动选择延迟最低的代理服务器
+                    selected_conf_name = cls.auto_select(confs)
+                else:
+                    selected_conf_name = list(confs)[n - 1]
+
+        if selected_conf_name not in confs:
+            ologger.error(f"✘ 不存在此代理服务器：{selected_conf_name}")
+            sys.exit(1)
+
+        # 记录选定的代理服务器名（配置文件名）到 nvram 变量
+        cls.set_nvram('unblockchn_ss_conf', selected_conf_name)
+
+        # 停止 ss-redir 若已运行
+        ss_redir_running = cls.check_ss_redir()
+        if ss_redir_running:
+            cls.stop_ss_redir()
+
+        # 启动 ss-redir
+        cls.start_ss_redir()
+
+        selected_conf = confs[selected_conf_name]
+        latencty_info = f"（{selected_conf['latency'] * 1000:.0f} ms）" if 'latency' in selected_conf else ""
+        ologger.info(f"切换到了 {selected_conf_name} 代理服务器{latencty_info}")
 
     @classmethod
     def cmd_check(cls, raw_args):
@@ -152,13 +273,13 @@ Unblock CHN 路由器命令：
             domain = args.url.split('/')[0]
         ip = socket.gethostbyname(domain)
 
-        cmd = "ipset test chn {}".format(ip)
+        cmd = f"ipset test chn {ip}"
         returncode = subprocess.call(
             cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if returncode == 0:
-            ologger.info("{} 走代理".format(ip))
+            ologger.info(f"{ip} 走代理")
         else:
-            ologger.info("{} 不走代理".format(ip))
+            ologger.info(f"{ip} 不走代理")
 
     @classmethod
     def cmd_renew(cls):
@@ -178,9 +299,9 @@ Unblock CHN 路由器命令：
 
         # 载入 ipset 规则
         headless_ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.headless.rules")
-        cmd = "ipset restore < {}".format(headless_ipset_conf_path)
+        cmd = f"ipset restore < {headless_ipset_conf_path}"
         subprocess.check_call(cmd, shell=True)
-        elogger.info("✔ 载入 ipset 规则：{}".format(cmd))
+        elogger.info(f"✔ 载入 ipset 规则：{cmd}")
 
         # 重启 dnsmasq
         cls.restart_dnsmasq()
@@ -240,10 +361,14 @@ Unblock CHN 还原路由器为未配置状态
             ss_redir_running = cls.check_ss_redir()
             if ss_redir_running:
                 cls.stop_ss_redir()
+
             # 从启动脚本里移除 ss-redir 启动命令
             comment = "# ss-redir"
             cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
-            elogger.info("✔ 从启动脚本里移除 ss-redir 启动命令：{}".format(SERVICES_START_SCRIPT_PATH))
+            elogger.info(f"✔ 从启动脚本里移除 ss-redir 启动命令：{SERVICES_START_SCRIPT_PATH}")
+
+            # 删除 nvram 中 unblockchn_ss_conf 变量
+            cls.remove_nvram('unblockchn_ss_conf')
 
         # 若 ipset 模板内有其它内容则生成对应配置文件并复制到 jffs
         # 否则就删除 jffs 中的配置文件
@@ -253,12 +378,12 @@ Unblock CHN 还原路由器为未配置状态
         else:
             if os.path.isfile(IPSET_CONF_JFFS_PATH):
                 os.remove(IPSET_CONF_JFFS_PATH)
-                elogger.info("✔ 删除：{}".format(IPSET_CONF_JFFS_PATH))
+                elogger.info(f"✔ 删除：{IPSET_CONF_JFFS_PATH}")
 
                 # 从启动脚本里移除 ipset 载入命令
                 comment = "# Load ipset rules"
                 cls.remove_from_script(NAT_START_SCRIPT_PATH, comment)
-                elogger.info("✔ 从启动脚本里移除 ipset 载入命令：{}".format(NAT_START_SCRIPT_PATH))
+                elogger.info(f"✔ 从启动脚本里移除 ipset 载入命令：{NAT_START_SCRIPT_PATH}")
 
         # 若 dnsmasq 模板内有其它内容则生成对应配置文件并复制到 jffs
         # 否则就删除 jffs 中的配置文件
@@ -268,18 +393,18 @@ Unblock CHN 还原路由器为未配置状态
         else:
             if os.path.isfile(DNSMASQ_CONF_JFFS_PATH):
                 os.remove(DNSMASQ_CONF_JFFS_PATH)
-                elogger.info("✔ 删除：{}".format(DNSMASQ_CONF_JFFS_PATH))
+                elogger.info(f"✔ 删除：{DNSMASQ_CONF_JFFS_PATH}")
 
         # 删除 iptables 规则
         iptables_chn_exists = cls.check_iptables_chn()
         if iptables_chn_exists:
             cls.delete_iptables_chn()
-            elogger.info("✔ 删除 iptables 规则：{}".format(DELETE_IPTABLES_CHN_CMD))
+            elogger.info(f"✔ 删除 iptables 规则：{DELETE_IPTABLES_CHN_CMD}")
 
         # 从启动脚本里移除 iptables 规则添加命令
         comment = "# Redirect chn ipset to ss-redir"
         cls.remove_from_script(NAT_START_SCRIPT_PATH, comment)
-        elogger.info("✔ 从启动脚本里移除 iptables 规则添加命令：{}".format(NAT_START_SCRIPT_PATH))
+        elogger.info(f"✔ 从启动脚本里移除 iptables 规则添加命令：{NAT_START_SCRIPT_PATH}")
 
         # 删除 ipset 的 chn 表
         ipset_cmd = "ipset destroy chn"
@@ -289,18 +414,18 @@ Unblock CHN 还原路由器为未配置状态
             if "The set with the given name does not exist" not in str(e.stderr):
                 raise e
         else:
-            elogger.info("✔ 删除 ipset 的 chn 表：{}".format(ipset_cmd))
+            elogger.info(f"✔ 删除 ipset 的 chn 表：{ipset_cmd}")
+
+        # 移除每日更新规则的 cron 定时任务
+        cls.remove_renew_cron_job()
 
         # 从启动脚本里移除 xt_set 模块加载命令
         comment = "# Load xt_set module"
         cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
-        elogger.info("✔ 从启动脚本里移除 xt_set 模块加载命令：{}".format(SERVICES_START_SCRIPT_PATH))
+        elogger.info(f"✔ 从启动脚本里移除 xt_set 模块加载命令：{SERVICES_START_SCRIPT_PATH}")
 
         # 删除 nvram 中 unblockchn_on 变量
         cls.remove_nvram('unblockchn_on')
-
-        # 移除每日更新规则的 cron 定时任务
-        cls.remove_renew_cron_job()
 
         # 重启 dnsmasq
         cls.restart_dnsmasq()
@@ -318,6 +443,145 @@ Unblock CHN 还原路由器为未配置状态
         ologger.info("生成配置文件成功")
 
     @classmethod
+    def setup_ss_redir(cls):
+        """配置 ss-redir"""
+
+        # 读取已有的代理服务器（配置文件）
+        confs = cls.load_ss_redir_confs()
+
+        # 列出已有代理服务器（配置文件）
+        if confs:
+            elogger.info(f"已有 {len(confs)} 个代理服务器：")
+            for i, conf_name in enumerate(confs):
+                conf = confs[conf_name]
+                elogger.info(f"{i + 1}) {conf_name}")
+                elogger.info(f"Shadowsocks 服务器地址：{conf['server']}")
+                elogger.info(f"Shadowsocks 服务器端口：{conf['server_port']}")
+                elogger.info(f"Shadowsocks 密码：{conf['password']}")
+                elogger.info(f"Shadowsocks 加密方法：{conf['method']}")
+
+        # 添加新的代理服务器（配置文件）
+        while True:
+            if confs:
+                r = input("是否添加更多代理服务器？[y/N]：") or "n"
+                if (not r.lower().startswith('y')) and (not r.lower().startswith('n')):
+                    elogger.error(f"✘ 无效输入：{r}")
+                    sys.exit(1)
+                if r.lower().startswith("n"):
+                    break
+
+            conf = SS_REDIR_CONF_TPL.copy()
+            if conf['server'] is None:
+                conf['server'] = input("Shadowsocks 服务器地址：").strip()
+            else:
+                print(f"Shadowsocks 服务器地址：{conf['server']}")
+            if conf['server_port'] is None:
+                conf['server_port'] = int(input("Shadowsocks 服务器端口：").strip())
+            else:
+                print(f"Shadowsocks 服务器端口：{conf['server_port']}")
+            if conf['password'] is None:
+                conf['password'] = input("Shadowsocks 密码：").strip()
+            else:
+                print(f"Shadowsocks 密码：{conf['password']}")
+            if conf['method'] is None:
+                conf['method'] = input("Shadowsocks 加密方法：").strip()
+            else:
+                print(f"Shadowsocks 加密方法：{conf['method']}")
+
+            conf_name = input("命名此代理服务器为：") or "CHN"
+            if conf_name not in confs:
+                confs[conf_name] = conf
+
+            conf_path = os.path.join(SHADOWSOCKS_DIR_PATH, f"{conf_name}.json")
+            with open(conf_path, 'w', encoding='utf-8') as f:
+                json.dump(conf, f, indent=4)
+
+            elogger.info(f"✔ 保存 ss-redir 配置文件：{conf_path}")
+
+        # 选择代理服务器（配置文件）
+        if len(confs) > 1:
+            elogger.info("0) 自动选择延迟最低的代理服务器")
+            for i, conf_name in enumerate(confs):
+                conf = confs[conf_name]
+                hostname = conf['server']
+                port = conf['server_port']
+                elogger.info(f"{i + 1}) {conf_name} [{hostname}:{port}]")
+            r = input(f"请选择要使用的代理服务器 [0-{len(confs)}]：") or "0"
+            try:
+                n = int(r)
+            except ValueError:
+                elogger.error(f"✘ 无效输入：{r}")
+                sys.exit(1)
+            if n > len(confs) or n < 0:
+                elogger.error(f"✘ 无效输入：{r}")
+                sys.exit(1)
+            if n == 0:
+                # 自动选择延迟最低的代理服务器
+                selected_conf_name = cls.auto_select(confs)
+            else:
+                selected_conf_name = list(confs)[n - 1]
+            elogger.info(f"使用 {selected_conf_name} 代理服务器")
+        else:
+            selected_conf_name = list(confs)[0]
+
+        # 记录选定的代理服务器名（配置文件名）到 nvram 变量
+        cls.set_nvram('unblockchn_ss_conf', selected_conf_name)
+
+        # 停止 ss-redir 若已运行
+        ss_redir_running = cls.check_ss_redir()
+        if ss_redir_running:
+            cls.stop_ss_redir()
+
+        # 启动 ss-redir
+        cls.start_ss_redir()
+
+        # 保存 ss-redir 启动命令到路由器的 services-start 启动脚本中
+        cmd = f'{SS_REDIR_PATH} -c {SHADOWSOCKS_DIR_PATH}/"$(nvram get unblockchn_ss_conf)".json -f {SS_REDIR_PID_PATH}'
+        comment = "# ss-redir"
+        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, cmd)
+        elogger.info(f"✔ 保存 ss-redir 启动命令到路由器的 services-start 启动脚本中：{SERVICES_START_SCRIPT_PATH}")
+
+    @classmethod
+    def setup_ipset_iptables(cls):
+        """配置 ipset 和 iptables"""
+
+        # 加载 xt_set 模块
+        xt_set_cmd = "modprobe xt_set"
+        subprocess.check_call(xt_set_cmd, shell=True)
+        elogger.info(f"✔ 加载 xt_set 模块：{xt_set_cmd}")
+
+        # 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中
+        comment = "# Load xt_set module"
+        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, xt_set_cmd)
+        elogger.info(f"✔ 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中：{SERVICES_START_SCRIPT_PATH}")
+
+        # 载入 ipset 规则
+        ipset_cmd = f"ipset restore < {IPSET_CONF_JFFS_PATH}"
+        try:
+            subprocess.check_output(ipset_cmd, shell=True, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            if "set with the same name already exists" not in str(e.stderr):
+                raise e
+        elogger.info(f"✔ 载入 ipset 规则：{ipset_cmd}")
+
+        # 保存 ipset 载入命令到路由器的 nat-start 启动脚本中
+        comment = "# Load ipset rules"
+        cls.append_to_script(NAT_START_SCRIPT_PATH, comment, ipset_cmd)
+        elogger.info(f"✔ 保存 ipset 载入命令到路由器的 nat-start 启动脚本中：{NAT_START_SCRIPT_PATH}")
+
+        # 添加 iptables 规则
+        iptables_chn_exists = cls.check_iptables_chn()
+        if not iptables_chn_exists:
+            cls.add_iptables_chn()
+        elogger.info(f"✔ 添加 iptables 规则：{ADD_IPTABLES_CHN_CMD}")
+
+        # 保存 iptables 添加规则命令到路由器的 nat-start 启动脚本中
+        comment = "# Redirect chn ipset to ss-redir"
+        cmd = f'if [ "$(nvram get unblockchn_on)" = "True" ]; then {ADD_IPTABLES_CHN_CMD}; fi'
+        cls.append_to_script(NAT_START_SCRIPT_PATH, comment, cmd)
+        elogger.info(f"✔ 保存 iptables 规则添加命令到路由器的 nat-start 启动脚本中：{NAT_START_SCRIPT_PATH}")
+
+    @classmethod
     def create_conf_files(cls, domains):
         """生成路由器 ipset 和 dnsmasq 规则配置文件"""
 
@@ -327,10 +591,10 @@ Unblock CHN 还原路由器为未配置状态
         if domains:
             for domain in domains:
                 if re.match(r"\d+\.\d+\.\d+\.\d+", domain):  # IP
-                    rule = "add chn {}".format(domain)
+                    rule = f"add chn {domain}"
                     ipset_rules.append(rule)
                 else:  # 域名
-                    rule = "ipset=/{}/chn".format(domain)
+                    rule = f"ipset=/{domain}/chn"
                     dnsmasq_rules.append(rule)
 
         # 从模板生成 ipset 规则配置文件 ipset.rules
@@ -410,153 +674,12 @@ Unblock CHN 还原路由器为未配置状态
         return True
 
     @classmethod
-    def setup_ss_redir(cls):
-        """配置 ss-redir"""
-
-        # 生成 ss-redir 配置文件
-        conf = SS_REDIR_CONF
-        if conf['server'] is None:
-            conf['server'] = input("Shadowsocks 服务器地址：").strip()
-        if conf['server_port'] is None:
-            conf['server_port'] = int(input("Shadowsocks 服务器端口：").strip())
-        if conf['password'] is None:
-            conf['password'] = input("Shadowsocks 密码：").strip()
-        if conf['method'] is None:
-            conf['method'] = input("Shadowsocks 加密方法：").strip()
-        with open(SS_REDIR_CONF_PATH, 'w', encoding='utf-8') as f:
-            json.dump(conf, f, indent=4)
-        elogger.info("✔ 保存 ss-redir 配置文件：{}".format(SS_REDIR_CONF_PATH))
-
-        # 启动 ss-redir
-        success = cls.start_ss_redir()
-        if not success:
-            cmd = "{} -c {}".format(SS_REDIR_PATH, SS_REDIR_CONF_PATH)
-            elogger.error("✘ 无法启动 ss-redir，请手动运行以下命令查看错误信息：\n{}".format(cmd))
-            sys.exit(1)
-
-        # 保存 ss-redir 启动命令到路由器的 services-start 启动脚本中
-        cmd = "{} -c {} -f {}"
-        cmd = cmd.format(SS_REDIR_PATH, SS_REDIR_CONF_PATH, SS_REDIR_PID_PATH)
-        comment = "# ss-redir"
-        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, cmd)
-        elogger.info("✔ 保存 ss-redir 启动命令到路由器的 services-start 启动脚本中：{}".format(SERVICES_START_SCRIPT_PATH))
-
-    @classmethod
-    def setup_ipset_iptables(cls):
-        """配置 ipset 和 iptables"""
-
-        # 加载 xt_set 模块
-        xt_set_cmd = "modprobe xt_set"
-        subprocess.check_call(xt_set_cmd, shell=True)
-        elogger.info("✔ 加载 xt_set 模块：{}".format(xt_set_cmd))
-
-        # 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中
-        comment = "# Load xt_set module"
-        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, xt_set_cmd)
-        elogger.info("✔ 保存 xt_set 模块加载命令到路由器的 services-start 启动脚本中：{}".format(SERVICES_START_SCRIPT_PATH))
-
-        # 载入 ipset 规则
-        ipset_cmd = "ipset restore < {}".format(IPSET_CONF_JFFS_PATH)
-        try:
-            subprocess.check_output(ipset_cmd, shell=True, stderr=subprocess.PIPE)
-        except subprocess.CalledProcessError as e:
-            if "set with the same name already exists" not in str(e.stderr):
-                raise e
-        elogger.info("✔ 载入 ipset 规则：{}".format(ipset_cmd))
-
-        # 保存 ipset 载入命令到路由器的 nat-start 启动脚本中
-        comment = "# Load ipset rules"
-        cls.append_to_script(NAT_START_SCRIPT_PATH, comment, ipset_cmd)
-        elogger.info("✔ 保存 ipset 载入命令到路由器的 nat-start 启动脚本中：{}".format(NAT_START_SCRIPT_PATH))
-
-        # 添加 iptables 规则
-        iptables_chn_exists = cls.check_iptables_chn()
-        if not iptables_chn_exists:
-            cls.add_iptables_chn()
-        elogger.info("✔ 添加 iptables 规则：{}".format(ADD_IPTABLES_CHN_CMD))
-
-        # 保存 iptables 添加规则命令到路由器的 nat-start 启动脚本中
-        comment = "# Redirect chn ipset to ss-redir"
-        cmd = 'if [ "$(nvram get unblockchn_on)" = "True" ]; then {}; fi'
-        cmd = cmd.format(ADD_IPTABLES_CHN_CMD)
-        cls.append_to_script(NAT_START_SCRIPT_PATH, comment, cmd)
-        elogger.info("✔ 保存 iptables 规则添加命令到路由器的 nat-start 启动脚本中：{}".format(NAT_START_SCRIPT_PATH))
-
-    @classmethod
-    def add_renew_cron_job(cls):
-        """添加每日更新规则的 cron 定时任务"""
-        renew_cmd = "0 {} * * * {} {} router renew"
-        unblockchn_path = os.path.realpath(__file__)
-        renew_cmd = renew_cmd.format(RENEW_TIME, PYTHON3_PATH, unblockchn_path)
-        cron_cmd = "cru a unblockchn_renew \"{}\""
-        cron_cmd = cron_cmd.format(renew_cmd)
-        try:
-            subprocess.check_call(cron_cmd, shell=True)
-        except subprocess.CalledProcessError as e:
-            elogger.exception(e)
-            elogger.warning("✘ 无法添加每日更新规则的定时任务，你需要手动添加以下条目到 crontab 中：\n{}".format(renew_cmd))
-            return
-        else:
-            elogger.info("✔ 定时每日 {} 点更新规则：{}".format(RENEW_TIME, cron_cmd))
-
-        # 保存以上定时命令到路由器的 services-start 启动脚本中
-        comment = "# unblockchn_renew cron job"
-        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, cron_cmd)
-        elogger.info("✔ 保存定时更新规则命令到路由器的 services-start 启动脚本中：{}".format(SERVICES_START_SCRIPT_PATH))
-
-    @classmethod
-    def remove_renew_cron_job(cls):
-        """移除每日更新规则的 cron 定时任务"""
-        cmd = "cru d unblockchn_renew"
-        subprocess.check_call(cmd, shell=True)
-        elogger.info("✔ 删除每日更新规则的 cron 定时任务：{}".format(cmd))
-
-        # 从启动脚本里移除定时命令
-        comment = "# unblockchn_renew cron job"
-        cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
-        elogger.info("✔ 从启动脚本里移除定时命令：{}".format(SERVICES_START_SCRIPT_PATH))
-
-    @classmethod
-    def start_ss_redir(cls):
-        """启动 ss-redir"""
-        cmd = "{} -c {} -f {}"
-        cmd = cmd.format(SS_REDIR_PATH, SS_REDIR_CONF_PATH, SS_REDIR_PID_PATH)
-        subprocess.call(cmd, shell=True)
-        time.sleep(1)
-        is_running = cls.check_ss_redir()
-        if is_running:
-            elogger.info("✔ 启动 ss-redir：{}".format(cmd))
-        return is_running
-
-    @classmethod
-    def stop_ss_redir(cls):
-        """停止 ss-redir"""
-        with open(SS_REDIR_PID_PATH, 'r', encoding='utf-8') as f:
-            pid = f.read()
-        cmd = "kill {}".format(pid)
-        subprocess.check_call(cmd, shell=True)
-        elogger.info("✔ 停止 ss-redir：{}".format(cmd))
-
-    @classmethod
-    def check_ss_redir(cls):
-        """检查 ss-redir 是否运行中"""
-        with open(SS_REDIR_PID_PATH, 'r', encoding='utf-8') as f:
-            pid = f.read()
-        return os.path.exists("/proc/{}".format(pid))
-
-    @classmethod
-    def restart_dnsmasq(cls):
-        """重启 dnsmasq"""
-        subprocess.check_call(DNSMASQ_RESTART_CMD, shell=True, stdout=subprocess.DEVNULL)
-        elogger.info("✔ 重启 dnsmasq：{}".format(DNSMASQ_RESTART_CMD))
-
-    @classmethod
     def cp_ipset_conf_to_jffs(cls):
         """复制 ipset 规则配置文件到 jffs 配置目录"""
         ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules")
         if os.path.isfile(ipset_conf_path):
             shutil.copy2(ipset_conf_path, IPSET_CONF_JFFS_PATH)
-            elogger.info("✔ 复制：{} -> {}".format(ipset_conf_path, IPSET_CONF_JFFS_PATH))
+            elogger.info(f"✔ 复制：{ipset_conf_path} -> {IPSET_CONF_JFFS_PATH}")
             return True
         return False
 
@@ -566,75 +689,9 @@ Unblock CHN 还原路由器为未配置状态
         dnsmasq_conf_path = os.path.join(CONFIGS_DIR_PATH, "dnsmasq.conf.add")
         if os.path.isfile(dnsmasq_conf_path):
             shutil.copy2(dnsmasq_conf_path, DNSMASQ_CONF_JFFS_PATH)
-            elogger.info("✔ 复制：{} -> {}".format(dnsmasq_conf_path, DNSMASQ_CONF_JFFS_PATH))
+            elogger.info(f"✔ 复制：{dnsmasq_conf_path} -> {DNSMASQ_CONF_JFFS_PATH}")
             return True
         return False
-
-    @classmethod
-    def check_setup(cls):
-        """检查路由器是否配置过"""
-        chn_ipset_exists = cls.check_chn_ipset()
-        if not chn_ipset_exists:
-            ologger.error("✘ 路由器未正确配置，请先运行以下命令进行配置：\npython3 unblockchn.py router setup")
-            sys.exit(1)
-
-    @classmethod
-    def check_ipset_iptables(cls):
-        """检查 iptables 和 ipset 命令是否存在"""
-        iptables_exists = cls.check_command('iptables')
-        ipset_exists = cls.check_command('ipset')
-        if not (iptables_exists and ipset_exists):
-            d = {'iptables': iptables_exists, 'ipset': ipset_exists}
-            missing = [k for k in d if not d[k]]
-            ologger.error("✘ 运行环境不支持 {} 命令".format(" 和 ".join(missing)))
-            sys.exit(1)
-
-    @classmethod
-    def check_chn_ipset(cls):
-        """检查 ipset 是否有 chn 表"""
-        cmd = "ipset list chn"
-        returncode = subprocess.call(
-            cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return returncode == 0
-
-    @classmethod
-    def flush_ipset(cls):
-        """清空 chn 和其它自定义的 ipset 表"""
-        ipset_names = cls.get_ipset_names()
-
-        for ipset_name in ipset_names:
-            cmd = "ipset flush {}".format(ipset_name)
-            subprocess.check_call(cmd, shell=True)
-            elogger.info("✔ 清空 ipset 的 {} 表：{}".format(ipset_name, cmd))
-
-    @classmethod
-    def destroy_ipset(cls):
-        """删除 chn 和其它自定义的 ipset 表"""
-        ipset_names = cls.get_ipset_names()
-
-        for ipset_name in ipset_names:
-            cmd = "ipset destroy {}".format(ipset_name)
-            try:
-                subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE)
-            except subprocess.CalledProcessError as e:
-                if "The set with the given name does not exist" not in str(e.stderr):
-                    raise e
-            else:
-                elogger.info("✔ 删除 ipset 的 {} 表：{}".format(ipset_name, cmd))
-
-    @classmethod
-    def get_ipset_names(cls):
-        ipset_names = {'chn'}
-        ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules")
-        if not os.path.isfile(ipset_conf_path):
-            return ipset_names
-        with open(ipset_conf_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                if not line.startswith("create "):
-                    continue
-                ipset_name = line.split(' ')[1]
-                ipset_names.add(ipset_name)
-        return ipset_names
 
     @classmethod
     def add_iptables_chn(cls):
@@ -654,6 +711,38 @@ Unblock CHN 还原路由器为未配置状态
         return returncode == 0
 
     @classmethod
+    def add_renew_cron_job(cls):
+        """添加每日更新规则的 cron 定时任务"""
+        unblockchn_path = os.path.realpath(__file__)
+        renew_cmd = f"0 {RENEW_TIME} * * * {PYTHON3_PATH} {unblockchn_path} router renew"
+        cron_cmd = f'cru a unblockchn_renew "{renew_cmd}"'
+        try:
+            subprocess.check_call(cron_cmd, shell=True)
+        except subprocess.CalledProcessError as e:
+            elogger.exception(e)
+            elogger.warning(f"✘ 无法添加每日更新规则的定时任务，你需要手动添加以下条目到 crontab 中：\n{renew_cmd}")
+            return
+        else:
+            elogger.info(f"✔ 定时每日 {RENEW_TIME} 点更新规则：{cron_cmd}")
+
+        # 保存以上定时命令到路由器的 services-start 启动脚本中
+        comment = "# unblockchn_renew cron job"
+        cls.append_to_script(SERVICES_START_SCRIPT_PATH, comment, cron_cmd)
+        elogger.info(f"✔ 保存定时更新规则命令到路由器的 services-start 启动脚本中：{SERVICES_START_SCRIPT_PATH}")
+
+    @classmethod
+    def remove_renew_cron_job(cls):
+        """移除每日更新规则的 cron 定时任务"""
+        cmd = "cru d unblockchn_renew"
+        subprocess.check_call(cmd, shell=True)
+        elogger.info(f"✔ 删除每日更新规则的 cron 定时任务：{cmd}")
+
+        # 从启动脚本里移除定时命令
+        comment = "# unblockchn_renew cron job"
+        cls.remove_from_script(SERVICES_START_SCRIPT_PATH, comment)
+        elogger.info(f"✔ 从启动脚本里移除定时命令：{SERVICES_START_SCRIPT_PATH}")
+
+    @classmethod
     def append_to_script(cls, script_path, comment, cmd):
         """添加命令到脚本"""
         if os.path.isfile(script_path):
@@ -665,7 +754,7 @@ Unblock CHN 还原路由器为未配置状态
             scpt += "\n" + comment + "\n" + cmd + "\n"
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(scpt)
-        cmd = "chmod a+rx {}".format(script_path)
+        cmd = f'chmod a+rx "{script_path}"'
         subprocess.check_call(cmd, shell=True)
 
     @classmethod
@@ -681,6 +770,122 @@ Unblock CHN 还原路由器为未配置状态
             f.write(scpt)
 
     @classmethod
+    def load_ss_redir_confs(cls):
+        """读取 ss-redir 代理服务器（配置文件）"""
+        confs = OrderedDict()
+        for name in os.listdir(SHADOWSOCKS_DIR_PATH):
+            if not name.endswith(".json"):
+                continue
+            if name.startswith("._"):
+                continue
+            conf_name = name[:-5]
+            conf_path = os.path.join(SHADOWSOCKS_DIR_PATH, name)
+            with open(conf_path, 'r', encoding='utf-8') as f:
+                conf = json.load(f)
+            confs[conf_name] = conf
+        return confs
+
+    @classmethod
+    def auto_select(cls, confs):
+        """自动选择延迟最低的代理服务器"""
+        working_confs = []
+        for i, conf_name in enumerate(confs):
+            conf = confs[conf_name]
+            hostname = conf['server']
+            port = conf['server_port']
+            try:
+                # 测试连接延迟
+                latency = cls.get_connection_time(hostname, port, times=3, timeout=5)
+                conf['latency'] = latency
+                result = f"{latency * 1000:.0f} ms"
+                working_confs.append({'name': conf_name, 'latency': latency})
+            except socket.gaierror:
+                result = "无效地址"
+            except socket.timeout:
+                result = "连接超时"
+            except ConnectionError:
+                result = "连接失败"
+            elogger.info(f"{i + 1}) {conf_name} [{hostname}:{port}]: {result}")
+        if not working_confs:
+            ologger.error("✘ 代理服务器都无法连接")
+            sys.exit(1)
+        fastest_conf = min(working_confs, key=lambda x: x['latency'])
+        fastest_conf_name = min(confs, key=lambda x: confs[x]['latency'])
+        return fastest_conf_name
+
+    @classmethod
+    def get_connection_time(cls, hostname, port, times=3, timeout=5):
+        """测试连接延迟"""
+        ip = socket.gethostbyname(hostname)
+        start = time.perf_counter()
+        for _ in range(times):
+            socket.create_connection((ip, port), timeout)
+        end = time.perf_counter()
+        duration = end - start
+        return duration / times
+
+    @classmethod
+    def start_ss_redir(cls):
+        """启动 ss-redir"""
+        conf_name = cls.get_nvram("unblockchn_ss_conf")
+        conf_path = os.path.join(SHADOWSOCKS_DIR_PATH, f"{conf_name}.json")
+        cmd = f"{SS_REDIR_PATH} -c {conf_path} -f {SS_REDIR_PID_PATH}"
+        subprocess.call(cmd, shell=True)
+        time.sleep(1)
+        is_running = cls.check_ss_redir()
+        if is_running:
+            elogger.info(f"✔ 启动 ss-redir（{conf_name} 代理服务器）：{cmd}")
+        else:
+            ologger.error("✘ 无法启动 ss-redir")
+            elogger.error(f"请手动运行以下命令查看错误信息：\n{cmd}")
+            sys.exit(1)
+
+    @classmethod
+    def stop_ss_redir(cls):
+        """停止 ss-redir"""
+        with open(SS_REDIR_PID_PATH, 'r', encoding='utf-8') as f:
+            pid = f.read()
+        cmd = f"kill {pid}"
+        subprocess.check_call(cmd, shell=True)
+        elogger.info(f"✔ 停止 ss-redir：{cmd}")
+
+    @classmethod
+    def check_ss_redir(cls):
+        """检查 ss-redir 是否运行中"""
+        if not os.path.isfile(SS_REDIR_PID_PATH):
+            return False
+        with open(SS_REDIR_PID_PATH, 'r', encoding='utf-8') as f:
+            pid = f.read()
+        return os.path.exists(f"/proc/{pid}")
+
+    @classmethod
+    def check_setup(cls):
+        """检查路由器是否配置过"""
+        chn_ipset_exists = cls.check_chn_ipset()
+        if not chn_ipset_exists:
+            ologger.error("✘ 路由器未正确配置，请先运行以下命令进行配置：\npython3 unblockchn.py router setup")
+            sys.exit(1)
+
+    @classmethod
+    def check_chn_ipset(cls):
+        """检查 ipset 是否有 chn 表"""
+        cmd = "ipset list chn"
+        returncode = subprocess.call(
+            cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return returncode == 0
+
+    @classmethod
+    def check_ipset_iptables(cls):
+        """检查 iptables 和 ipset 命令是否存在"""
+        iptables_exists = cls.check_command('iptables')
+        ipset_exists = cls.check_command('ipset')
+        if not (iptables_exists and ipset_exists):
+            d = {'iptables': iptables_exists, 'ipset': ipset_exists}
+            missing = [k for k in d if not d[k]]
+            ologger.error(f"✘ 运行环境不支持 {' 和 '.join(missing)} 命令")
+            sys.exit(1)
+
+    @classmethod
     def check_command(cls, command):
         """检查命令是否存在"""
         returncode = subprocess.call(
@@ -692,10 +897,54 @@ Unblock CHN 还原路由器为未配置状态
             return False
 
     @classmethod
+    def flush_ipset(cls):
+        """清空 chn 和其它自定义的 ipset 表"""
+        ipset_names = cls.get_ipset_names()
+
+        for ipset_name in ipset_names:
+            cmd = f"ipset flush {ipset_name}"
+            subprocess.check_call(cmd, shell=True)
+            elogger.info(f"✔ 清空 ipset 的 {ipset_name} 表：{cmd}")
+
+    @classmethod
+    def destroy_ipset(cls):
+        """删除 chn 和其它自定义的 ipset 表"""
+        ipset_names = cls.get_ipset_names()
+
+        for ipset_name in ipset_names:
+            cmd = f"ipset destroy {ipset_name}"
+            try:
+                subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE)
+            except subprocess.CalledProcessError as e:
+                if "The set with the given name does not exist" not in str(e.stderr):
+                    raise e
+            else:
+                elogger.info(f"✔ 删除 ipset 的 {ipset_name} 表：{cmd}")
+
+    @classmethod
+    def get_ipset_names(cls):
+        ipset_names = {'chn'}
+        ipset_conf_path = os.path.join(CONFIGS_DIR_PATH, "ipset.rules")
+        if not os.path.isfile(ipset_conf_path):
+            return ipset_names
+        with open(ipset_conf_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.startswith("create "):
+                    continue
+                ipset_name = line.split(' ')[1]
+                ipset_names.add(ipset_name)
+        return ipset_names
+
+    @classmethod
+    def restart_dnsmasq(cls):
+        """重启 dnsmasq"""
+        subprocess.check_call(DNSMASQ_RESTART_CMD, shell=True, stdout=subprocess.DEVNULL)
+        elogger.info(f"✔ 重启 dnsmasq：{DNSMASQ_RESTART_CMD}")
+
+    @classmethod
     def set_nvram(cls, name, value):
         """设置 nvram 值"""
-        cmd = "nvram set {}={}"
-        cmd = cmd.format(name, value)
+        cmd = f"nvram set {name}={value}"
         subprocess.check_call(cmd, shell=True)
         cmd = "nvram commit"
         subprocess.check_call(cmd, shell=True)
@@ -703,16 +952,14 @@ Unblock CHN 还原路由器为未配置状态
     @classmethod
     def get_nvram(cls, name):
         """获取 nvram 值"""
-        cmd = "nvram get {}"
-        cmd = cmd.format(name)
+        cmd = f"nvram get {name}"
         output = subprocess.check_output(cmd, shell=True)
-        return output.strip()
+        return output.strip().decode('utf-8')
 
     @classmethod
     def remove_nvram(cls, name):
         """删除 nvram 值"""
-        cmd = "nvram unset {}"
-        cmd = cmd.format(name)
+        cmd = f"nvram unset {name}"
         subprocess.check_call(cmd, shell=True)
         cmd = "nvram commit"
         subprocess.check_call(cmd, shell=True)
@@ -755,10 +1002,10 @@ Unblock CHN
         # 保存生成的文件到 args.dst
         if args.dst:
             if not os.path.exists(args.dst):
-                elogger.error("✘ 目的地文件夹不存在：{}".format(args.dst))
+                elogger.error(f"✘ 目的地文件夹不存在：{args.dst}")
                 sys.exit(1)
             if not os.path.isdir(args.dst):
-                elogger.error("✘ 目的地路径非文件夹：{}".format(args.dst))
+                elogger.error(f"✘ 目的地路径非文件夹：{args.dst}")
                 sys.exit(1)
             if args.ruleset:  # 复制 Surge ruleset 文件
                 cls.cp_ruleset_file(args.dst)
@@ -785,16 +1032,14 @@ Unblock CHN
                 reg_url = re.escape(url)
                 reg_url = reg_url.replace("\\*", ".*")
                 reg_url = "^" + reg_url
-                rule = "URL-REGEX,{}"
-                rule = rule.format(reg_url)
+                rule = f"URL-REGEX,{reg_url}"
             else:  # https
                 domain = urlsplit(url).hostname
                 if domain.startswith("*."):  # DOMAIN-SUFFIX
                     domain = domain.replace("*.", "", 1)
-                    rule = "AND,((DOMAIN-SUFFIX,{}),(DEST-PORT,443))"
+                    rule = f"AND,((DOMAIN-SUFFIX,{domain}),(DEST-PORT,443))"
                 else:  # DOMAIN
-                    rule = "AND,((DOMAIN,{}),(DEST-PORT,443))"
-                rule = rule.format(domain)
+                    rule = f"AND,((DOMAIN,{domain}),(DEST-PORT,443))"
             rules.append(rule)
         return rules
 
@@ -805,9 +1050,9 @@ Unblock CHN
         for domain in black_domains:
             if domain.startswith("*."):  # DOMAIN-SUFFIX
                 domain = domain.replace("*.", "", 1)
-                rule = "DOMAIN-SUFFIX,{}".format(domain)
+                rule = f"DOMAIN-SUFFIX,{domain}"
             else:  # DOMAIN
-                rule = "DOMAIN,{}".format(domain)
+                rule = f"DOMAIN,{domain}"
             black_rules.append(rule)
         rules = {
             'black': black_rules,
@@ -841,7 +1086,7 @@ Unblock CHN
             with open(conf_path, 'w', encoding='utf-8') as f:
                 f.write(conf)
             has_conf = True
-            elogger.info("✔ 生成 Surge 配置文件（surge 目录）：{}".format(conf_name))
+            elogger.info(f"✔ 生成 Surge 配置文件（surge 目录）：{conf_name}")
 
         return has_conf
 
@@ -863,7 +1108,7 @@ Unblock CHN
             src_path = os.path.join(SURGE_DIR_PATH, name)
             dst_path = os.path.join(dst, name)
             shutil.copy2(src_path, dst_path)
-            elogger.info("✔ 保存 Surge 配置文件到：{}".format(dst_path))
+            elogger.info(f"✔ 保存 Surge 配置文件到：{dst_path}")
 
     @classmethod
     def cp_ruleset_file(cls, dst):
@@ -872,7 +1117,7 @@ Unblock CHN
         src_path = os.path.join(SURGE_DIR_PATH, name)
         dst_path = os.path.join(dst, name)
         shutil.copy2(src_path, dst_path)
-        elogger.info("✔ 保存 Surge ruleset 文件到：{}".format(dst_path))
+        elogger.info(f"✔ 保存 Surge ruleset 文件到：{dst_path}")
 
 
 class UnblockYouku(object):
@@ -951,10 +1196,10 @@ class UnblockYouku(object):
 
     def extract(self, name):
         """从 Unblock Youku 的 urls.js 中提取指定的 URL 列表"""
-        pattern = "unblock_youku\\.{}\\s*=.+?(\\[.+?\\])".format(name)
+        pattern = f"unblock_youku\\.{name}\\s*=.+?(\\[.+?\\])"
         match = re.search(pattern, self.source, re.DOTALL)
         if not match:
-            elogger.error("✘ 从 Unblock Youku 提取 {} 规则失败".format(name))
+            elogger.error(f"✘ 从 Unblock Youku 提取 {name} 规则失败")
             sys.exit(1)
         s = match.group(1)
         s = s.replace("'", '"')  # 替换单引号为双引号

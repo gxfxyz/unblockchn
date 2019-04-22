@@ -24,14 +24,12 @@ PYTHON3_PATH = "/opt/bin/python3"
 
 # ss_redir 命令路径
 SS_REDIR_PATH = "/opt/bin/ss-redir"
-# ss_redir 配置文件路径
-SS_REDIR_CONF_PATH = os.path.join(SHADOWSOCKS_DIR_PATH, "ss-redir.json")
 # ss_redir pid 文件路径
 SS_REDIR_PID_PATH = os.path.join(SHADOWSOCKS_DIR_PATH, "ss-redir.pid")
 # ss_redir 本地端口
 SS_REDIR_LOCAL_PORT = 1080
-# ss_redir 配置
-SS_REDIR_CONF = {
+# ss_redir 配置模板
+SS_REDIR_CONF_TPL = {
     "server": None,
     "server_port": None,
     "local_address": "0.0.0.0",
@@ -44,11 +42,11 @@ SS_REDIR_CONF = {
 }
 
 # iptables 添加 chn ipset 规则命令
-ADD_IPTABLES_CHN_CMD = "iptables -t nat -A PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {}".format(SS_REDIR_LOCAL_PORT)
+ADD_IPTABLES_CHN_CMD = f"iptables -t nat -A PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {SS_REDIR_LOCAL_PORT}"
 # iptables 删除 chn ipset 规则命令
-DELETE_IPTABLES_CHN_CMD = "iptables -t nat -D PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {}".format(SS_REDIR_LOCAL_PORT)
+DELETE_IPTABLES_CHN_CMD = f"iptables -t nat -D PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {SS_REDIR_LOCAL_PORT}"
 # iptables 检查 chn ipset 规则命令
-CHECK_IPTABLES_CHN_CMD = "iptables -t nat -C PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {}".format(SS_REDIR_LOCAL_PORT)
+CHECK_IPTABLES_CHN_CMD = f"iptables -t nat -C PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {SS_REDIR_LOCAL_PORT}"
 
 # ipset 规则配置文件在 jffs 分区下的保存路径
 IPSET_CONF_JFFS_PATH = "/jffs/configs/ipset.rules"

@@ -16,6 +16,8 @@ Unblock CHN 是一个帮助配置 Shadowsocks 回国代理分流的命令行小�
         - [查看代理状态](#%E6%9F%A5%E7%9C%8B%E4%BB%A3%E7%90%86%E7%8A%B6%E6%80%81)
         - [关闭代理](#%E5%85%B3%E9%97%AD%E4%BB%A3%E7%90%86)
         - [开启代理](#%E5%BC%80%E5%90%AF%E4%BB%A3%E7%90%86)
+        - [列出代理服务器](#%E5%88%97%E5%87%BA%E4%BB%A3%E7%90%86%E6%9C%8D%E5%8A%A1%E5%99%A8)
+        - [切换代理服务器](#%E5%88%87%E6%8D%A2%E4%BB%A3%E7%90%86%E6%9C%8D%E5%8A%A1%E5%99%A8)
         - [检查 <URL/IP/域名> 是否走代理](#%E6%A3%80%E6%9F%A5-urlip%E5%9F%9F%E5%90%8D-%E6%98%AF%E5%90%A6%E8%B5%B0%E4%BB%A3%E7%90%86)
         - [更新规则](#%E6%9B%B4%E6%96%B0%E8%A7%84%E5%88%99)
         - [还原路由器为未配置状态](#%E8%BF%98%E5%8E%9F%E8%B7%AF%E7%94%B1%E5%99%A8%E4%B8%BA%E6%9C%AA%E9%85%8D%E7%BD%AE%E7%8A%B6%E6%80%81)
@@ -94,20 +96,22 @@ $ pip3 install -r requirements.txt
 
 ```console
 $ python3 unblockchn.py router --help
-usage: python3 unblockchn.py router [-h] {status,on,off,check,renew,setup,restore,create}
+usage: python3 unblockchn.py router [-h] {status,on,off,servers,switch,check,renew,setup,restore,create}
 
 Unblock CHN 路由器命令：
-  status                  查看代理状态
-  on                      开启代理
-  off                     关闭代理
-  check <URL/IP/域名>     检查 <URL/IP/域名> 是否走代理
-  renew                   更新规则
-  setup [--no-ss]         一键配置路由器 [--no-ss: 跳过配置 ss-redir]
-  restore [--no-ss]       还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
-  create                  仅生成 ipset 和 dnsmasq 规则配置文件
+  status                    查看代理状态
+  on                        开启代理
+  off                       关闭代理
+  servers [--json]          列出代理服务器 [--json: 输出 json 格式]
+  switch [name] [--auto]    切换代理服务器 [--auto: 自动选择延迟最低的代理服务器]
+  check <URL/IP/域名>       检查 <URL/IP/域名> 是否走代理
+  renew                     更新规则
+  setup [--no-ss]           一键配置路由器 [--no-ss: 跳过配置 ss-redir]
+  restore [--no-ss]         还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
+  create                    仅生成 ipset 和 dnsmasq 规则配置文件
 
 positional arguments:
-  {status,on,off,check,renew,setup,restore,create}
+  {status,on,off,servers,switch,check,renew,setup,restore,create}
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -117,16 +121,28 @@ optional arguments:
 
 ```console
 $ python3 unblockchn.py router setup
-Shadowsocks 服务器地址：xxx.xxx.xxx.xxx
-Shadowsocks 服务器端口：xxxx
+Shadowsocks 服务器地址：180.160.0.1
+Shadowsocks 服务器端口：1111
 Shadowsocks 密码：xxxxxxxxxx
-Shadowsocks 加密方法：xxxxxxx
-✔ 保存 ss-redir 配置文件：/tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.json
-✔ 启动 ss-redir：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.json -f /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.pid
+Shadowsocks 加密方法：rc4-md5
+命名此代理服务器为：Shanghai
+✔ 保存 ss-redir 配置文件：/tmp/mnt/sda1/unblockchn/shadowsocks/Shanghai.json
+是否添加更多代理服务器？[y/N]：y
+Shadowsocks 服务器地址：beijing.asuscomm.com
+Shadowsocks 服务器端口：2222
+Shadowsocks 密码：xxxxxxxxxx
+Shadowsocks 加密方法：aes-128-cfb
+命名此代理服务器为：Beijing
+✔ 保存 ss-redir 配置文件：/tmp/mnt/sda1/unblockchn/shadowsocks/Beijing.json
+是否添加更多代理服务器？[y/N]：n
+0) 自动选择延迟最低的代理服务器
+1) Shanghai [180.160.0.1:1111]
+2) Beijing [beijing.asuscomm.com:2222]
+请选择要使用的代理服务器 [0-2]：1
+使用 Shanghai 代理服务器
+✔ 启动 ss-redir（Shanghai 代理服务器）：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/shadowsocks/Shanghai.json -f /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.pid
 ✔ 保存 ss-redir 启动命令到路由器的 services-start 启动脚本中：/jffs/scripts/services-start
-✔ 生成 ipset 默认配置模板文件（configs 目录）：ipset.rules.tpl
 ✔ 生成 ipset 配置文件（configs 目录）：ipset.rules & ipset.headless.rules
-✔ 生成 dnsmasq 默认配置模板文件（configs 目录）：dnsmasq.conf.add.tpl
 ✔ 生成 dnsmasq 配置文件（configs 目录）：dnsmasq.conf.add
 ✔ 复制：/tmp/mnt/sda1/unblockchn/configs/ipset.rules -> /jffs/configs/ipset.rules
 ✔ 复制：/tmp/mnt/sda1/unblockchn/configs/dnsmasq.conf.add -> /jffs/configs/dnsmasq.conf.add
@@ -142,7 +158,7 @@ Shadowsocks 加密方法：xxxxxxx
 配置成功
 ```
 
-如果想要跳过配置 ss-redir，那么就加上 --no-ss 参数：
+如果想要跳过配置 ss-redir，那么就加上 `--no-ss` 参数：
 
 ```console
 $ python3 unblockchn.py router setup --no-ss
@@ -158,7 +174,7 @@ http://uku.im/check
 
 ```console
 $ python3 unblockchn.py router status
-已开启
+已开启 (Shanghai)
 ```
 
 #### 关闭代理
@@ -167,11 +183,97 @@ $ python3 unblockchn.py router status
 $ python3 unblockchn.py router off
 关闭成功
 ```
+
 #### 开启代理
 
 ```console
 $ python3 unblockchn.py router on
-开启成功
+开启成功 (Shanghai)
+```
+
+#### 列出代理服务器
+
+```console
+$ python3 unblockchn.py router servers
+共有 2 个代理服务器：
+1) Beijing
+Shadowsocks 服务器地址：beijing.asuscomm.com
+Shadowsocks 服务器端口：2222
+Shadowsocks 密码：xxxxxxxxxx
+Shadowsocks 加密方法：aes-128-cfb
+2) Shanghai
+Shadowsocks 服务器地址：180.160.0.1
+Shadowsocks 服务器端口：1111
+Shadowsocks 密码：xxxxxxxxxx
+Shadowsocks 加密方法：rc4-md5
+-
+目前使用的代理服务器为：Shanghai
+```
+
+如果加上 `--json` 参数，则会输出 json 格式：
+
+```console
+$ python3 unblockchn.py router servers --json
+{
+    "Beijing": {
+        "server": "beijing.asuscomm.com",
+        "server_port": 2222,
+        "local_address": "0.0.0.0",
+        "local_port": 1080,
+        "password": "xxxxxxxxxx",
+        "timeout": 300,
+        "method": "aes-128-cfb",
+        "fast_open": false,
+        "mode": "tcp_and_udp"
+    },
+    "Shanghai": {
+        "server": "180.160.0.1",
+        "server_port": 1111,
+        "local_address": "0.0.0.0",
+        "local_port": 1080,
+        "password": "xxxxxxxxxx",
+        "timeout": 300,
+        "method": "rc4-md5",
+        "fast_open": false,
+        "mode": "tcp_and_udp",
+        "selected": true
+    }
+}
+```
+
+ss-redir 代理服务器配置文件保存在 `shadowsocks` 子目录下，你可以手动删改。
+
+#### 切换代理服务器
+
+```console
+$ python3 unblockchn.py router switch
+0) 自动选择延迟最低的代理服务器
+1) Beijing [beijing.asuscomm.com:2222]
+2) Shanghai [180.160.0.1:1111]
+请选择要使用的代理服务器 [0-2]：1
+✔ 停止 ss-redir：kill 21810
+✔ 启动 ss-redir（Beijing 代理服务器）：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/shadowsocks/Beijing.json -f /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.pid
+切换到了 Beijing 代理服务器
+```
+
+或者直接输入代理服务器名来切换：
+
+```console
+$ python3 unblockchn.py router switch Shanghai
+✔ 停止 ss-redir：kill 21987
+✔ 启动 ss-redir（Shanghai 代理服务器）：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/shadowsocks/Shanghai.json -f /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.pid
+切换到了 Shanghai 代理服务器
+```
+
+你可以使用 `--auto` 参数，让 Unblock CHN 自动选择延迟最低的代理服务器：
+
+```console
+$ python3 unblockchn.py router switch --auto
+1) Beijing [beijing.asuscomm.com:2222]: 237 ms
+2) Shanghai [180.160.0.1:1111]: 523 ms
+✔ 停止 ss-redir：kill 22584
+✔ 启动 ss-redir（Beijing 代理服务器）：/opt/bin/ss-redir -c /tmp/mnt/sda1/unblockchn/shadowsocks/Beijing.json -f /tmp/mnt/sda1/unblockchn/shadowsocks/ss-redir.pid
+切换到了 Beijing 代理服务器（237 ms）
 ```
 
 #### 检查 <URL/IP/域名> 是否走代理
@@ -210,7 +312,7 @@ Unblock CHN 在路由器上默认定时每日 03:00 自动更新分流规则，�
 
 ```console
 $ python3 unblockchn.py router restore
-✔ 停止 ss-redir：kill 17981
+✔ 停止 ss-redir：kill 24427
 ✔ 从启动脚本里移除 ss-redir 启动命令：/jffs/scripts/services-start
 ✔ 删除：/jffs/configs/ipset.rules
 ✔ 从启动脚本里移除 ipset 载入命令：/jffs/scripts/nat-start
@@ -218,14 +320,14 @@ $ python3 unblockchn.py router restore
 ✔ 删除 iptables 规则：iptables -t nat -D PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port 1080
 ✔ 从启动脚本里移除 iptables 规则添加命令：/jffs/scripts/nat-start
 ✔ 删除 ipset 的 chn 表：ipset destroy chn
-✔ 从启动脚本里移除 xt_set 模块加载命令：/jffs/scripts/services-start
 ✔ 删除每日更新规则的 cron 定时任务：cru d unblockchn_renew
 ✔ 从启动脚本里移除定时命令：/jffs/scripts/services-start
+✔ 从启动脚本里移除 xt_set 模块加载命令：/jffs/scripts/services-start
 ✔ 重启 dnsmasq：service restart_dnsmasq
 还原成功
 ```
 
-如果想要跳过还原 ss-redir，那么就加上 --no-ss 参数：
+如果想要跳过还原 ss-redir，那么就加上 `--no-ss` 参数：
 
 ```console
 $ python3 unblockchn.py router restore --no-ss
@@ -279,17 +381,17 @@ $ python3 unblockchn.py router renew
 
 在 iOS 的通知中心里远程（局域网内）控制路由器上的 Unblock CHN 代理。
 
-![unblockchn_shortcut](https://user-images.githubusercontent.com/43481676/47972350-2d7d6c00-e050-11e8-8c52-aa7152f8f795.jpg)
+![unblockchn_shortcut](https://user-images.githubusercontent.com/43481676/56479612-28c83b00-646b-11e9-8a06-476e8eaa017f.jpg)
 
-[点此安装](https://www.icloud.com/shortcuts/105e946b6e8844cc82fd870038cfb8a5)
+[点此安装（版本：2019.04.21）](https://www.icloud.com/shortcuts/ebd706e862d14a10915df0b466a11ef5)
 
 #### Alfred Workflow
 
 在 macOS 上用 Alfred 来远程（局域网内）控制路由器上的 Unblock CHN 代理。
 
-![unblockchn_alfred](https://user-images.githubusercontent.com/43481676/47972357-53a30c00-e050-11e8-9104-7dd640b8b6e8.png)
+![unblockchn_alfred](https://user-images.githubusercontent.com/43481676/56479251-4b595480-6469-11e9-8c60-3b3d80ed4350.png)
 
-[点此下载](https://github.com/gxfxyz/unblockchn/raw/master/unblockchn.alfredworkflow)
+[点此下载（版本：2019.04.21）](https://github.com/gxfxyz/unblockchn/raw/master/unblockchn.alfredworkflow)
 
 **关键词：**
 
