@@ -1075,6 +1075,8 @@ Unblock CHN
         for name in os.listdir(SURGE_DIR_PATH):
             if not name.endswith(".conf.tpl"):
                 continue
+            if name.startswith("._"):
+                continue
             if name == "sample_surge.conf.tpl":  # 跳过样例模板
                 continue
             tpl_path = os.path.join(SURGE_DIR_PATH, name)
@@ -1104,6 +1106,8 @@ Unblock CHN
         """复制目录下的 Surge 配置文件到 dst 文件夹"""
         for name in os.listdir(SURGE_DIR_PATH):
             if not name.endswith('.conf'):
+                continue
+            if name.startswith("._"):
                 continue
             src_path = os.path.join(SURGE_DIR_PATH, name)
             dst_path = os.path.join(dst, name)
