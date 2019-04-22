@@ -449,7 +449,7 @@ Unblock CHN 从 Unblock Youku 提取分流规则，生成相应的 Surge 规则�
 
 [unblockchn.surge.ruleset](https://gist.github.com/gxfxyz/0d0d91c526a6b07f59a700039f9fa334#file-unblockchn-surge-ruleset)
 
-[RULESET](https://nssurge-english.zendesk.com/hc/en-us/articles/360010493933-Surge-Mac-3-Release-Note) 是 Surge Mac 3 新加入的功能，目前 iOS 版 Surge 还未支持（Shadowrocket 也不支持）。
+[RULESET](https://nssurge-english.zendesk.com/hc/en-us/articles/360010493933-Surge-Mac-3-Release-Note) 是 Surge 3 新加入的功能（Shadowrocket 不支持）。
 
 RULESET 让 Surge 配置文件可以通过路径或 URL 来引用外部规则文件，例如你可以这样引用 Unblock CHN 的 ruleset：
 
