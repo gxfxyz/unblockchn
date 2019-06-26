@@ -1236,6 +1236,7 @@ Unblock CHN
         black_domains = unblock_youku.black_domains
         rules = cls.domain_rules(black_domains)
         cls.create_ruleset_file(rules)
+        cls.create_pac_file()
 
 
         # 保存生成的文件到 args.dst
