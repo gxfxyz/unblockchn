@@ -1226,13 +1226,15 @@ Unblock CHN
 生成 ACL 文件
 """
         parser = argparse.ArgumentParser(usage=cls.execute.__doc__)
-        parser.add_argument('-r', '--ruleset', action='store_true', help="生成 Surge ruleset 文件")
+        parser.add_argument('-p', '--pac', action='store_true', help="生成 PAC 文件")
+        parser.add_argument('-a', '--acl', action='store_true', help="生成 ACL 文件")
         parser.add_argument('-d', '--dst', help="保存生成的文件到此目录")
         args = parser.parse_args(raw_args)
 
         unblock_youku = UnblockYouku()
 
-        # 生成 ACL ruleset 文件
+        
+        # 生成 ruleset 文件
         black_domains = unblock_youku.black_domains
         rules = cls.domain_rules(black_domains)
         cls.create_ruleset_file(rules)
@@ -1248,34 +1250,57 @@ Unblock CHN
     def domain_rules(cls, black_domains):
         """生成基于域名的规则"""
         black_rules = []
-        for domain in black_domains:
-            if domain.startswith("*."):  # DOMAIN-SUFFIX
-                domain = domain.replace("*.", "", 1)
-                rule = f"\"||{domain}\","
-            else:  # DOMAIN
-                rule = f"\"||{domain}\","
-            black_rules.append(rule)
+        if args.acl:
+            for domain in black_domains:
+                if domain.startswith("*."):  # DOMAIN-SUFFIX
+                    domain = domain.replace("*.", "", 1)
+                    domain = domain.replace(".", "\.", 1)
+                    rule = f"(^|\.){domain}$"
+                else:  # DOMAIN
+                    domain = domain.replace(".", "\.", 1)
+                    rule = f"(^|\.){domain}$"
+                black_rules.append(rule)
+        else:
+            for domain in black_domains:
+                if domain.startswith("*."):  # DOMAIN-SUFFIX
+                    domain = domain.replace("*.", "", 1)
+                    rule = f"\"||{domain}\","
+                else:  # DOMAIN
+                    rule = f"\"||{domain}\","
+                black_rules.append(rule)
         rules = {
             'black': black_rules,
             'white': []
         }
         return rules
 
+    
     @classmethod
     def create_ruleset_file(cls, rules):
         """生成 ACL ruleset 文件"""
         rules = "\n".join(rules['black'])
-        ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.acl.ruleset")
-        with open(ruleset_file_path, 'w', encoding='utf-8') as f:
-            f.write(rules)
-        elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：unblockchn.acl.ruleset")
-
+        if args.acl:
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.acl.ruleset")
+            with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+                f.write(rules)
+            elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：unblockchn.acl.ruleset")
+        else:
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.pac.ruleset")
+            with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+                f.write(rules)
+            elogger.info("✔ 生成 PAC ruleset 文件（acl 目录）：unblockchn.pac.ruleset")
                           
     @classmethod
     def create_pac_file(cls):
-        """生成 ACL ruleset 文件"""
-        filenames = ['head.txt', 'unblockchn.acl.ruleset', 'foot.txt']
-        ruleset_file_path = os.path.join(ACL_DIR_PATH, "pac.txt")
+        if args.acl:
+        
+            """生成 ACL ruleset 文件"""
+        filenames = ['acl_head.txt', 'unblockchn.acl.ruleset', 'acl_foot.txt']
+        ruleset_file_path = os.path.join(ACL_DIR_PATH, "china.acl")
+        else:
+            """生成 PAC ruleset 文件"""
+            filenames = ['pac_head.txt', 'unblockchn.pac.ruleset', 'pac_foot.txt']
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "pac.txt")                          
         with open(ruleset_file_path, 'w', encoding='utf-8') as f:
             for fname in filenames:
                 with open("acl/"+fname) as infile:
