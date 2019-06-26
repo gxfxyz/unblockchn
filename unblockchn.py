@@ -1314,7 +1314,7 @@ Unblock CHN
         elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：pac.txt")
         
     @classmethod
-    def is_ipv4(ip):
+    def is_ipv4(cls, ip):
         match = re.match("^(\d{0,3})\.(\d{0,3})\.(\d{0,3})\.(\d{0,3})$", ip)
         if not match:
             return False
