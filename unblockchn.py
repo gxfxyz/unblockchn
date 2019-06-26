@@ -1278,7 +1278,7 @@ Unblock CHN
         ruleset_file_path = os.path.join(ACL_DIR_PATH, "pac.txt")
         with open(ruleset_file_path, 'w', encoding='utf-8') as f:
             for fname in filenames:
-                with open(fname) as infile:
+                with open("acl"+fname) as infile:
                     for line in infile:
                         f.write(line)
         elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：pac.txt")
