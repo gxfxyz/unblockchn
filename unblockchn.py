@@ -1219,7 +1219,7 @@ class Acl(object):
 
     @classmethod
     def execute(cls, raw_args):
-        """python3 unblockchn.py surge [-h] [-d DST]
+        """python3 unblockchn.py acl [-h] [-d DST]
 
 Unblock CHN
 
@@ -1247,7 +1247,7 @@ Unblock CHN
         # 保存生成的文件到 args.dst
         if args.dst:
             # 复制 ACL ruleset 文件
-            cls.cp_ruleset_file(args.dst)
+            cls.cp_ruleset_file(args.dst, check)
 
     @classmethod
     def domain_rules(cls, black_domains, check):
