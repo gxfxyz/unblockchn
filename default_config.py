@@ -10,6 +10,8 @@ DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 CONFIGS_DIR_PATH = os.path.join(DIR_PATH, "configs")
 # surge 子目录路径
 SURGE_DIR_PATH = os.path.join(DIR_PATH, "surge")
+# acl 子目录路径
+ACL_DIR_PATH = os.path.join(DIR_PATH, "acl")
 # shadowsocks 子目录路径
 SHADOWSOCKS_DIR_PATH = os.path.join(DIR_PATH, "shadowsocks")
 

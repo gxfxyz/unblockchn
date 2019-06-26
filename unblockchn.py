@@ -28,11 +28,12 @@ ologger = logging.getLogger('stdout')
 
 
 def main():
-    """python3 unblockchn.py [-h] {router,surge}
+    """python3 unblockchn.py [-h] {router,surge,acl}
 
 Unblock CHN 命令：
   router                  路由器相关命令
   surge                   Surge 相关命令
+  acl                     acl相关命令
 """
     elogger.debug("")
     elogger.debug(" ".join(sys.argv))
@@ -41,14 +42,15 @@ Unblock CHN 命令：
     organize()
 
     parser = argparse.ArgumentParser(usage=main.__doc__)
-    parser.add_argument('cmd', choices=['router', 'surge'])
+    parser.add_argument('cmd', choices=['router', 'surge','acl'])
     args = parser.parse_args(sys.argv[1:2])
 
     if args.cmd == 'router':
         Router.execute(sys.argv[2:])
     elif args.cmd == 'surge':
         Surge.execute(sys.argv[2:])
-
+    elif args.cmd == 'acl':
+        Acl.execute(sys.argv[2:])
 
 class Router(object):
 
@@ -1122,6 +1124,228 @@ Unblock CHN
         dst_path = os.path.join(dst, name)
         shutil.copy2(src_path, dst_path)
         elogger.info(f"✔ 保存 Surge ruleset 文件到：{dst_path}")
+
+
+class UnblockYouku(object):
+
+    def __init__(self):
+        super(UnblockYouku, self).__init__()
+        self.source = requests.get(UNBLOCK_YOUKU_URLSJS_URL).text
+        self._black_urls = None
+        self._white_urls = None
+        self._black_domains = None
+        self._white_domains = None
+
+    @property
+    def black_urls(self):
+        """URLs 黑名单"""
+        if self._black_urls is not None:
+            return self._black_urls
+
+        header_urls = self.extract('header_urls')
+        redirect_urls = self.extract('redirect_urls')
+        chrome_proxy_urls = self.extract('chrome_proxy_urls')
+        pac_proxy_urls = self.extract('pac_proxy_urls')
+
+        self._black_urls = header_urls + redirect_urls + chrome_proxy_urls + pac_proxy_urls
+        self._black_urls = list(set(self._black_urls))
+        self._black_urls.sort()
+
+        return self._black_urls
+
+    @property
+    def white_urls(self):
+        """URLs 白名单"""
+        if self._white_urls is not None:
+            return self._white_urls
+
+        chrome_proxy_bypass_urls = self.extract('chrome_proxy_bypass_urls')
+        pac_proxy_bypass_urls = self.extract('pac_proxy_bypass_urls')
+
+        self._white_urls = chrome_proxy_bypass_urls + pac_proxy_bypass_urls
+        self._white_urls = list(set(self._white_urls))
+        self._white_urls.sort()
+
+        return self._white_urls
+
+    @property
+    def black_domains(self):
+        """域名黑名单"""
+        if self._black_domains is not None:
+            return self._black_domains
+
+        self._black_domains = []
+        for url in self.black_urls:
+            domain = urlsplit(url).hostname
+            self._black_domains.append(domain)
+
+        self._black_domains = list(set(self._black_domains))
+        self._black_domains.sort(key=lambda s: s[::-1], reverse=True)
+
+        return self._black_domains
+
+    @property
+    def white_domains(self):
+        """域名白名单"""
+        if self._white_domains is not None:
+            return self._white_domains
+
+        self._white_domains = []
+        for url in self.white_urls:
+            domain = urlsplit(url).hostname
+            self._white_domains.append(domain)
+
+        self._white_domains = list(set(self._white_domains))
+        self._white_domains.sort(key=lambda s: s[::-1], reverse=True)
+
+        return self._white_domains
+
+    def extract(self, name):
+        """从 Unblock Youku 的 urls.js 中提取指定的 URL 列表"""
+        pattern = f"unblock_youku\\.{name}\\s*=.+?(\\[.+?\\])"
+        match = re.search(pattern, self.source, re.DOTALL)
+        if not match:
+            elogger.error(f"✘ 从 Unblock Youku 提取 {name} 规则失败")
+            sys.exit(1)
+        s = match.group(1)
+        s = s.replace("'", '"')  # 替换单引号为双引号
+        s = re.sub(r"(?<!:)//.+", "", s)  # 去除注释
+        s = re.sub(r",\s*\]", "\n]", s)  # 去除跟在最后一个元素后面的逗号
+        urls = json.loads(s)
+        return urls
+
+
+class Acl(object):
+
+    @classmethod
+    def execute(cls, raw_args):
+        """python3 unblockchn.py acl [-h] [-d DST]
+
+Unblock CHN
+
+生成 ACL 文件
+"""
+        parser = argparse.ArgumentParser(usage=cls.execute.__doc__)
+        parser.add_argument('-p', '--pac', action='store_true', help="生成 PAC 文件")
+        parser.add_argument('-a', '--acl', action='store_true', help="生成 ACL 文件")
+        parser.add_argument('-d', '--dst', help="保存生成的文件到此目录")
+        args = parser.parse_args(raw_args)
+
+        unblock_youku = UnblockYouku()
+
+        if args.acl:
+            check = True
+        else:
+            check = False
+        # 生成 ruleset 文件
+        black_domains = unblock_youku.black_domains
+        rules = cls.domain_rules(black_domains, check)
+        cls.create_ruleset_file(rules, check)
+        cls.create_pac_file(check)
+
+
+        # 保存生成的文件到 args.dst
+        if args.dst:
+            # 复制 ACL ruleset 文件
+            cls.cp_ruleset_file(args.dst, check)
+
+    @classmethod
+    def domain_rules(cls, black_domains, check):
+        """生成基于域名的规则"""
+        black_rules = []
+        if check:
+            for domain in black_domains:
+                if domain.startswith("*."):  # DOMAIN-SUFFIX
+                    domain = domain.replace("*.", "", 1)
+                    domain = domain.replace(".", "\.")
+                    rule = f"(^|\.){domain}$"
+                else:  # DOMAIN
+                    if cls.is_ipv4(domain):
+                        rule = f"{domain}"  
+                    else:
+                        domain = domain.replace(".", "\.")
+                        rule = f"(^|\.){domain}$"
+                black_rules.append(rule)
+        else:
+            for domain in black_domains:
+                if domain.startswith("*."):  # DOMAIN-SUFFIX
+                    domain = domain.replace("*.", "", 1)
+                    rule = f"\t\"||{domain}\","
+                else:  # DOMAIN
+                    rule = f"\t\"||{domain}\","
+                black_rules.append(rule)
+        rules = {
+            'black': black_rules,
+            'white': []
+        }
+        return rules
+
+    
+    @classmethod
+    def create_ruleset_file(cls, rules, check):
+        """生成 ACL ruleset 文件"""
+        rules = "\n".join(rules['black'])
+        if check:
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.acl.ruleset")
+            with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+                f.write(rules)
+            elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：unblockchn.acl.ruleset")
+        else:
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.pac.ruleset")
+            with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+                f.write(rules)
+            elogger.info("✔ 生成 PAC ruleset 文件（acl 目录）：unblockchn.pac.ruleset")
+                          
+    @classmethod
+    def create_pac_file(cls, check):
+        if check:
+            """生成 ACL ruleset 文件"""
+            filenames = ['acl_head.txt', 'unblockchn.acl.ruleset', 'acl_foot.txt']
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "china.acl")
+        else:
+            """生成 PAC ruleset 文件"""
+            filenames = ['pac_head.txt', 'unblockchn.pac.ruleset', 'pac_foot.txt']
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "pac.txt")                          
+        with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+            for fname in filenames:
+                with open("acl/"+fname) as infile:
+                    for line in infile:
+                        f.write(line)
+        if check:
+            elogger.info("✔ 生成 ACL 文件（acl 目录）：china.acl")
+        else:
+            elogger.info("✔ 生成 PAC 文件（acl 目录）：pac.txt")                          
+        
+    @classmethod
+    def is_ipv4(cls, ip):
+        match = re.match("^(\d{0,3})\.(\d{0,3})\.(\d{0,3})\.(\d{0,3})$", ip)
+        if not match:
+            return False
+        quad = []
+        for number in match.groups():
+            quad.append(int(number))
+        if quad[0] < 1:
+            return False
+        for number in quad:
+            if number > 255 or number < 0:
+                return False
+        return True
+
+    @classmethod
+    def cp_ruleset_file(cls, dst, check):
+        """复制目录下的 ACL ruleset 文件到 dst 文件夹"""
+        if check:
+            name = "china.acl"
+        else:
+            name = "pac.txt"
+        src_path = os.path.join(ACL_DIR_PATH, name)
+        dst_path = os.path.join(dst, name)
+        shutil.copy2(src_path, dst_path)
+        if check:
+            elogger.info(f"✔ 保存 ACL 文件到：{dst_path}")
+        else:
+            elogger.info(f"✔ 保存 PAC 文件到：{dst_path}")
+        
 
 
 class UnblockYouku(object):

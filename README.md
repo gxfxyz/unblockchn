@@ -37,6 +37,12 @@ Unblock CHN 是一个帮助配置 Shadowsocks 回国代理分流的命令行小�
         - [指定目录](#%E6%8C%87%E5%AE%9A%E7%9B%AE%E5%BD%95)
         - [生成基于 URL 正则表达式的规则](#%E7%94%9F%E6%88%90%E5%9F%BA%E4%BA%8E-url-%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E7%9A%84%E8%A7%84%E5%88%99)
         - [生成 RULESET](#%E7%94%9F%E6%88%90-ruleset)
+* [其他配置文件](#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6)
+    + [安装](#%E5%AE%89%E8%A3%85-2)
+    + [使用](#%E4%BD%BF%E7%94%A8-2)
+        - [生成PAC文件](#%E7%94%9F%E6%88%90pac%E6%96%87%E4%BB%B6)
+        - [指定目录](#%E6%8C%87%E5%AE%9A%E7%9B%AE%E5%BD%95-1)
+        - [生成ACL规则](#%E7%94%9F%E6%88%90acl%E8%A7%84%E5%88%99)
 
 ---
 
@@ -583,6 +589,106 @@ $ python3 unblockchn.py surge --ruleset
 ```
 
 [RULESET 文件的使用](#ruleset-%E6%96%87%E4%BB%B6)
+
+---
+## 其他配置文件
+
+### 安装
+
+1. 安装 Unblock CHN：
+
+```console
+$ git clone https://github.com/stevenzhu25/unblockchn.git
+```
+
+2. 进入 Unblock CHN 目录：
+
+```console
+$ cd unblockchn
+```
+
+3. 安装 Unblock CHN 依赖：
+
+- 通过 [pipenv](https://github.com/pypa/pipenv)（推荐）
+
+```console
+# 安装依赖并创建虚拟环境
+$ pipenv install
+
+# 激活 pipenv 虚拟环境
+$ pipenv shell
+```
+
+- 通过 pip
+
+```console
+$ pip3 install -r requirements.txt
+```
+
+### 使用
+
+```console
+$ python3 unblockchn.py acl --help
+usage: python3 unblockchn.py acl [-h] [-d DST]
+
+Unblock CHN
+
+生成 ACL 文件
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p, --pac          生成 PAC 文件
+  -a, --acl          生成 ACL 文件
+  -d DST, --dst DST  保存生成的文件到此目录
+
+```
+
+#### 生成PAC文件
+
+```console
+$ python3 unblockchn.py acl
+✔ 生成 PAC ruleset 文件（acl 目录）：unblockchn.pac.ruleset
+✔ 生成 PAC 文件（acl 目录）：pac.txt
+```
+
+Unblock CHN 就会在 `acl` 子目录下生成PAC列表 `unblockchn.pac.ruleset` 及 Pac 配置文件 `pac.txt`。
+
+载入配置文件后，可以访问下列地址以验证回国代理是否成功，如果显示 `true`，就说明回国代理已生效： 
+
+http://uku.im/check
+
+#### 指定目录
+
+你可以添加 `-d` 参数，让 Unblock CHN 在生成配置文件后，将其复制到另外一个文件夹，例如 iCloud Drive 或其它网盘文件夹，这样可以方便在手机上更新配置文件：
+
+```console
+$ python3 unblockchn.py acl -d ~/
+✔ 生成 PAC ruleset 文件（acl 目录）：unblockchn.pac.ruleset
+✔ 生成 PAC 文件（acl 目录）：pac.txt
+✔ 保存 PAC 文件到：/home/stevenchu/pac.txt
+```
+
+#### 生成ACL规则
+
+你可以使用 `--acl` 参数：
+
+```console
+$ python3 unblockchn.py acl --acl
+✔ 生成 ACL ruleset 文件（acl 目录）：unblockchn.acl.ruleset
+✔ 生成 ACL 文件（acl 目录）：china.acl
+```
+
+让 Unblock CHN 生成ACL规则，例如：
+
+```
+(^|\.)app\.bilibili\.com$
+```
+
+而 Unblock CHN 默认生成的是基于域名的 PAC 规则，例如：
+
+```
+"||iface2.iqiyi.com",
+```
 
 ---
 
