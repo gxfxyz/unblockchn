@@ -1311,7 +1311,10 @@ Unblock CHN
                 with open("acl/"+fname) as infile:
                     for line in infile:
                         f.write(line)
-        elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：pac.txt")
+        if check:
+            elogger.info("✔ 生成 ACL 文件（acl 目录）：china.acl")
+        else:
+            elogger.info("✔ 生成 PAC 文件（acl 目录）：pac.txt")                          
         
     @classmethod
     def is_ipv4(cls, ip):
@@ -1329,13 +1332,20 @@ Unblock CHN
         return True
 
     @classmethod
-    def cp_ruleset_file(cls, dst):
+    def cp_ruleset_file(cls, dst, check):
         """复制目录下的 ACL ruleset 文件到 dst 文件夹"""
-        name = "unblockchn.acl.ruleset"
+        if check:
+            name = "china.acl"
+        else:
+            name = "pac.txt"
         src_path = os.path.join(ACL_DIR_PATH, name)
         dst_path = os.path.join(dst, name)
         shutil.copy2(src_path, dst_path)
-        elogger.info(f"✔ 保存 ACL ruleset 文件到：{dst_path}")
+        if check:
+            elogger.info(f"✔ 保存 ACL 文件到：{dst_path}")
+        else:
+            elogger.info(f"✔ 保存 PAC 文件到：{dst_path}")
+        
 
 
 class UnblockYouku(object):
