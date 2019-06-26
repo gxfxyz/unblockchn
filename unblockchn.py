@@ -1295,8 +1295,8 @@ Unblock CHN
         if args.acl:
         
             """生成 ACL ruleset 文件"""
-        filenames = ['acl_head.txt', 'unblockchn.acl.ruleset', 'acl_foot.txt']
-        ruleset_file_path = os.path.join(ACL_DIR_PATH, "china.acl")
+            filenames = ['acl_head.txt', 'unblockchn.acl.ruleset', 'acl_foot.txt']
+            ruleset_file_path = os.path.join(ACL_DIR_PATH, "china.acl")
         else:
             """生成 PAC ruleset 文件"""
             filenames = ['pac_head.txt', 'unblockchn.pac.ruleset', 'pac_foot.txt']
