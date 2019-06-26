@@ -1299,7 +1299,6 @@ Unblock CHN
     @classmethod
     def create_pac_file(cls, check):
         if check:
-        
             """生成 ACL ruleset 文件"""
             filenames = ['acl_head.txt', 'unblockchn.acl.ruleset', 'acl_foot.txt']
             ruleset_file_path = os.path.join(ACL_DIR_PATH, "china.acl")
@@ -1326,7 +1325,7 @@ Unblock CHN
             return False
         for number in quad:
             if number > 255 or number < 0:
-            return False
+                return False
         return True
 
     @classmethod
