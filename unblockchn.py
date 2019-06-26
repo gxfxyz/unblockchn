@@ -1267,9 +1267,9 @@ Unblock CHN
             for domain in black_domains:
                 if domain.startswith("*."):  # DOMAIN-SUFFIX
                     domain = domain.replace("*.", "", 1)
-                    rule = f"\"||{domain}\","
+                    rule = f"\t\"||{domain}\","
                 else:  # DOMAIN
-                    rule = f"\"||{domain}\","
+                    rule = f"\t\"||{domain}\","
                 black_rules.append(rule)
         rules = {
             'black': black_rules,
