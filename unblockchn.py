@@ -1233,12 +1233,15 @@ Unblock CHN
 
         unblock_youku = UnblockYouku()
 
-        
+        if args.acl:
+            check = True
+        else:
+            check = False
         # 生成 ruleset 文件
         black_domains = unblock_youku.black_domains
-        rules = cls.domain_rules(black_domains)
-        cls.create_ruleset_file(rules)
-        cls.create_pac_file()
+        rules = cls.domain_rules(black_domains, check)
+        cls.create_ruleset_file(rules, check)
+        cls.create_pac_file(check)
 
 
         # 保存生成的文件到 args.dst
@@ -1247,10 +1250,10 @@ Unblock CHN
             cls.cp_ruleset_file(args.dst)
 
     @classmethod
-    def domain_rules(cls, black_domains):
+    def domain_rules(cls, black_domains, check):
         """生成基于域名的规则"""
         black_rules = []
-        if args.acl:
+        if check:
             for domain in black_domains:
                 if domain.startswith("*."):  # DOMAIN-SUFFIX
                     domain = domain.replace("*.", "", 1)
@@ -1276,10 +1279,10 @@ Unblock CHN
 
     
     @classmethod
-    def create_ruleset_file(cls, rules):
+    def create_ruleset_file(cls, rules, check):
         """生成 ACL ruleset 文件"""
         rules = "\n".join(rules['black'])
-        if args.acl:
+        if check:
             ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.acl.ruleset")
             with open(ruleset_file_path, 'w', encoding='utf-8') as f:
                 f.write(rules)
@@ -1291,8 +1294,8 @@ Unblock CHN
             elogger.info("✔ 生成 PAC ruleset 文件（acl 目录）：unblockchn.pac.ruleset")
                           
     @classmethod
-    def create_pac_file(cls):
-        if args.acl:
+    def create_pac_file(cls, check):
+        if check:
         
             """生成 ACL ruleset 文件"""
             filenames = ['acl_head.txt', 'unblockchn.acl.ruleset', 'acl_foot.txt']
