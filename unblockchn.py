@@ -1269,6 +1269,19 @@ Unblock CHN
             f.write(rules)
         elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：unblockchn.acl.ruleset")
 
+                          
+    @classmethod
+    def create_pac_file(cls):
+        """生成 ACL ruleset 文件"""
+        filenames = ['head.txt', 'unblockchn.acl.ruleset', 'foot.txt']
+        ruleset_file_path = os.path.join(ACL_DIR_PATH, "pac.txt")
+        with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+            for fname in filenames:
+                with open(fname) as infile:
+                    for line in infile:
+                        f.write(line)
+        elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：pac.txt")
+
     @classmethod
     def cp_ruleset_file(cls, dst):
         """复制目录下的 ACL ruleset 文件到 dst 文件夹"""
