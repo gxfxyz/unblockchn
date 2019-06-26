@@ -1260,7 +1260,7 @@ Unblock CHN
                     domain = domain.replace(".", "\.")
                     rule = f"(^|\.){domain}$"
                 else:  # DOMAIN
-                    if is_ipv4(domain):
+                    if cls.is_ipv4(domain):
                         rule = f"{domain}"  
                     else:
                         domain = domain.replace(".", "\.")
