@@ -1260,7 +1260,7 @@ Unblock CHN
                     domain = domain.replace(".", "\.")
                     rule = f"(^|\.){domain}$"
                 else:  # DOMAIN
-                    domain = domain.replace(".", "\.", 1)
+                    domain = domain.replace(".", "\.")
                     rule = f"(^|\.){domain}$"
                 black_rules.append(rule)
         else:
