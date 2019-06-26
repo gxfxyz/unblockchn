@@ -28,11 +28,12 @@ ologger = logging.getLogger('stdout')
 
 
 def main():
-    """python3 unblockchn.py [-h] {router,surge}
+    """python3 unblockchn.py [-h] {router,surge,acl}
 
 Unblock CHN 命令：
   router                  路由器相关命令
   surge                   Surge 相关命令
+  acl                     acl相关命令
 """
     elogger.debug("")
     elogger.debug(" ".join(sys.argv))
@@ -41,14 +42,15 @@ Unblock CHN 命令：
     organize()
 
     parser = argparse.ArgumentParser(usage=main.__doc__)
-    parser.add_argument('cmd', choices=['router', 'surge'])
+    parser.add_argument('cmd', choices=['router', 'surge','acl'])
     args = parser.parse_args(sys.argv[1:2])
 
     if args.cmd == 'router':
         Router.execute(sys.argv[2:])
     elif args.cmd == 'surge':
         Surge.execute(sys.argv[2:])
-
+    elif args.cmd == 'acl':
+        Acl.execute(sys.argv[2:])
 
 class Router(object):
 
@@ -1053,6 +1055,214 @@ Unblock CHN
                 rule = f"DOMAIN-SUFFIX,{domain}"
             else:  # DOMAIN
                 rule = f"DOMAIN,{domain}"
+            black_rules.append(rule)
+        rules = {
+            'black': black_rules,
+            'white': []
+        }
+        return rules
+
+    @classmethod
+    def create_conf_files(cls, rules):
+        """从模板生成 Surge 规则配置文件"""
+        white_rules = rules['white']
+        white_rules = [rule + "," + "DIRECT" for rule in white_rules]
+        black_rules = rules['black']
+        black_rules = [rule + "," + SURGE_PROXY_GROUP_NAME for rule in black_rules]
+
+        rules = "\n".join(white_rules + black_rules)
+
+        has_conf = False
+
+        for name in os.listdir(SURGE_DIR_PATH):
+            if not name.endswith(".conf.tpl"):
+                continue
+            if name.startswith("._"):
+                continue
+            if name == "sample_surge.conf.tpl":  # 跳过样例模板
+                continue
+            tpl_path = os.path.join(SURGE_DIR_PATH, name)
+            with open(tpl_path, 'r', encoding='utf-8') as f:
+                tpl = f.read()
+            conf_name = name[:-4]
+            conf_path = os.path.join(SURGE_DIR_PATH, conf_name)
+            conf = tpl.format(rules=rules)
+            with open(conf_path, 'w', encoding='utf-8') as f:
+                f.write(conf)
+            has_conf = True
+            elogger.info(f"✔ 生成 Surge 配置文件（surge 目录）：{conf_name}")
+
+        return has_conf
+
+    @classmethod
+    def create_ruleset_file(cls, rules):
+        """生成 Surge ruleset 文件"""
+        rules = "\n".join(rules['black'])
+        ruleset_file_path = os.path.join(SURGE_DIR_PATH, "unblockchn.surge.ruleset")
+        with open(ruleset_file_path, 'w', encoding='utf-8') as f:
+            f.write(rules)
+        elogger.info("✔ 生成 Surge ruleset 文件（surge 目录）：unblockchn.surge.ruleset")
+
+    @classmethod
+    def cp_conf_files(cls, dst):
+        """复制目录下的 Surge 配置文件到 dst 文件夹"""
+        for name in os.listdir(SURGE_DIR_PATH):
+            if not name.endswith('.conf'):
+                continue
+            if name.startswith("._"):
+                continue
+            src_path = os.path.join(SURGE_DIR_PATH, name)
+            dst_path = os.path.join(dst, name)
+            shutil.copy2(src_path, dst_path)
+            elogger.info(f"✔ 保存 Surge 配置文件到：{dst_path}")
+
+    @classmethod
+    def cp_ruleset_file(cls, dst):
+        """复制目录下的 Surge ruleset 文件到 dst 文件夹"""
+        name = "unblockchn.surge.ruleset"
+        src_path = os.path.join(SURGE_DIR_PATH, name)
+        dst_path = os.path.join(dst, name)
+        shutil.copy2(src_path, dst_path)
+        elogger.info(f"✔ 保存 Surge ruleset 文件到：{dst_path}")
+
+
+class UnblockYouku(object):
+
+    def __init__(self):
+        super(UnblockYouku, self).__init__()
+        self.source = requests.get(UNBLOCK_YOUKU_URLSJS_URL).text
+        self._black_urls = None
+        self._white_urls = None
+        self._black_domains = None
+        self._white_domains = None
+
+    @property
+    def black_urls(self):
+        """URLs 黑名单"""
+        if self._black_urls is not None:
+            return self._black_urls
+
+        header_urls = self.extract('header_urls')
+        redirect_urls = self.extract('redirect_urls')
+        chrome_proxy_urls = self.extract('chrome_proxy_urls')
+        pac_proxy_urls = self.extract('pac_proxy_urls')
+
+        self._black_urls = header_urls + redirect_urls + chrome_proxy_urls + pac_proxy_urls
+        self._black_urls = list(set(self._black_urls))
+        self._black_urls.sort()
+
+        return self._black_urls
+
+    @property
+    def white_urls(self):
+        """URLs 白名单"""
+        if self._white_urls is not None:
+            return self._white_urls
+
+        chrome_proxy_bypass_urls = self.extract('chrome_proxy_bypass_urls')
+        pac_proxy_bypass_urls = self.extract('pac_proxy_bypass_urls')
+
+        self._white_urls = chrome_proxy_bypass_urls + pac_proxy_bypass_urls
+        self._white_urls = list(set(self._white_urls))
+        self._white_urls.sort()
+
+        return self._white_urls
+
+    @property
+    def black_domains(self):
+        """域名黑名单"""
+        if self._black_domains is not None:
+            return self._black_domains
+
+        self._black_domains = []
+        for url in self.black_urls:
+            domain = urlsplit(url).hostname
+            self._black_domains.append(domain)
+
+        self._black_domains = list(set(self._black_domains))
+        self._black_domains.sort(key=lambda s: s[::-1], reverse=True)
+
+        return self._black_domains
+
+    @property
+    def white_domains(self):
+        """域名白名单"""
+        if self._white_domains is not None:
+            return self._white_domains
+
+        self._white_domains = []
+        for url in self.white_urls:
+            domain = urlsplit(url).hostname
+            self._white_domains.append(domain)
+
+        self._white_domains = list(set(self._white_domains))
+        self._white_domains.sort(key=lambda s: s[::-1], reverse=True)
+
+        return self._white_domains
+
+    def extract(self, name):
+        """从 Unblock Youku 的 urls.js 中提取指定的 URL 列表"""
+        pattern = f"unblock_youku\\.{name}\\s*=.+?(\\[.+?\\])"
+        match = re.search(pattern, self.source, re.DOTALL)
+        if not match:
+            elogger.error(f"✘ 从 Unblock Youku 提取 {name} 规则失败")
+            sys.exit(1)
+        s = match.group(1)
+        s = s.replace("'", '"')  # 替换单引号为双引号
+        s = re.sub(r"(?<!:)//.+", "", s)  # 去除注释
+        s = re.sub(r",\s*\]", "\n]", s)  # 去除跟在最后一个元素后面的逗号
+        urls = json.loads(s)
+        return urls
+
+
+class Acl(object):
+
+    @classmethod
+    def execute(cls, raw_args):
+        """python3 unblockchn.py surge [-h] [-d DST]
+
+Unblock CHN
+
+生成 ACL 文件
+"""
+        parser = argparse.ArgumentParser(usage=cls.execute.__doc__)
+        parser.add_argument('-r', '--ruleset', action='store_true', help="生成 Surge ruleset 文件")
+        parser.add_argument('-d', '--dst', help="保存生成的文件到此目录")
+        args = parser.parse_args(raw_args)
+
+        unblock_youku = UnblockYouku()
+
+        if args.ruleset:  # 生成 Surge ruleset 文件
+            black_domains = unblock_youku.black_domains
+            rules = cls.domain_rules(black_domains)
+            cls.create_ruleset_file(rules)
+        else:  # 生成 Surge 规则配置文件
+            has_conf = cls.create_conf_files(rules)
+            if not has_conf:
+                elogger.error("✘ 目录下不存在后缀为 .conf.tpl 的 Surge 配置模板文件（忽略 sample_surge.conf.tpl）")
+                sys.exit(1)
+
+        # 保存生成的文件到 args.dst
+        if args.dst:
+            if not os.path.exists(args.dst):
+                elogger.error(f"✘ 目的地文件夹不存在：{args.dst}")
+                sys.exit(1)
+            if not os.path.isdir(args.dst):
+                elogger.error(f"✘ 目的地路径非文件夹：{args.dst}")
+                sys.exit(1)
+            if args.ruleset:  # 复制 Surge ruleset 文件
+                cls.cp_ruleset_file(args.dst)
+
+    @classmethod
+    def domain_rules(cls, black_domains):
+        """生成基于域名的规则"""
+        black_rules = []
+        for domain in black_domains:
+            if domain.startswith("*."):  # DOMAIN-SUFFIX
+                domain = domain.replace("*.", "", 1)
+                rule = f"\"||{domain}"
+            else:  # DOMAIN
+                rule = f"\"||{domain}"
             black_rules.append(rule)
         rules = {
             'black': black_rules,
