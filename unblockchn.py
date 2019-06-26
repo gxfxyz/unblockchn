@@ -1232,26 +1232,16 @@ Unblock CHN
 
         unblock_youku = UnblockYouku()
 
-        if args.ruleset:  # 生成 Surge ruleset 文件
-            black_domains = unblock_youku.black_domains
-            rules = cls.domain_rules(black_domains)
-            cls.create_ruleset_file(rules)
-        else:  # 生成 Surge 规则配置文件
-            has_conf = cls.create_conf_files(rules)
-            if not has_conf:
-                elogger.error("✘ 目录下不存在后缀为 .conf.tpl 的 Surge 配置模板文件（忽略 sample_surge.conf.tpl）")
-                sys.exit(1)
+        # 生成 ACL ruleset 文件
+        black_domains = unblock_youku.black_domains
+        rules = cls.domain_rules(black_domains)
+        cls.create_ruleset_file(rules)
+
 
         # 保存生成的文件到 args.dst
         if args.dst:
-            if not os.path.exists(args.dst):
-                elogger.error(f"✘ 目的地文件夹不存在：{args.dst}")
-                sys.exit(1)
-            if not os.path.isdir(args.dst):
-                elogger.error(f"✘ 目的地路径非文件夹：{args.dst}")
-                sys.exit(1)
-            if args.ruleset:  # 复制 Surge ruleset 文件
-                cls.cp_ruleset_file(args.dst)
+            # 复制 ACL ruleset 文件
+            cls.cp_ruleset_file(args.dst)
 
     @classmethod
     def domain_rules(cls, black_domains):
@@ -1260,9 +1250,9 @@ Unblock CHN
         for domain in black_domains:
             if domain.startswith("*."):  # DOMAIN-SUFFIX
                 domain = domain.replace("*.", "", 1)
-                rule = f"\"||{domain}"
+                rule = f"\"||{domain}\","
             else:  # DOMAIN
-                rule = f"\"||{domain}"
+                rule = f"\"||{domain}\","
             black_rules.append(rule)
         rules = {
             'black': black_rules,
@@ -1271,67 +1261,22 @@ Unblock CHN
         return rules
 
     @classmethod
-    def create_conf_files(cls, rules):
-        """从模板生成 Surge 规则配置文件"""
-        white_rules = rules['white']
-        white_rules = [rule + "," + "DIRECT" for rule in white_rules]
-        black_rules = rules['black']
-        black_rules = [rule + "," + SURGE_PROXY_GROUP_NAME for rule in black_rules]
-
-        rules = "\n".join(white_rules + black_rules)
-
-        has_conf = False
-
-        for name in os.listdir(SURGE_DIR_PATH):
-            if not name.endswith(".conf.tpl"):
-                continue
-            if name.startswith("._"):
-                continue
-            if name == "sample_surge.conf.tpl":  # 跳过样例模板
-                continue
-            tpl_path = os.path.join(SURGE_DIR_PATH, name)
-            with open(tpl_path, 'r', encoding='utf-8') as f:
-                tpl = f.read()
-            conf_name = name[:-4]
-            conf_path = os.path.join(SURGE_DIR_PATH, conf_name)
-            conf = tpl.format(rules=rules)
-            with open(conf_path, 'w', encoding='utf-8') as f:
-                f.write(conf)
-            has_conf = True
-            elogger.info(f"✔ 生成 Surge 配置文件（surge 目录）：{conf_name}")
-
-        return has_conf
-
-    @classmethod
     def create_ruleset_file(cls, rules):
-        """生成 Surge ruleset 文件"""
+        """生成 ACL ruleset 文件"""
         rules = "\n".join(rules['black'])
-        ruleset_file_path = os.path.join(SURGE_DIR_PATH, "unblockchn.surge.ruleset")
+        ruleset_file_path = os.path.join(ACL_DIR_PATH, "unblockchn.acl.ruleset")
         with open(ruleset_file_path, 'w', encoding='utf-8') as f:
             f.write(rules)
-        elogger.info("✔ 生成 Surge ruleset 文件（surge 目录）：unblockchn.surge.ruleset")
-
-    @classmethod
-    def cp_conf_files(cls, dst):
-        """复制目录下的 Surge 配置文件到 dst 文件夹"""
-        for name in os.listdir(SURGE_DIR_PATH):
-            if not name.endswith('.conf'):
-                continue
-            if name.startswith("._"):
-                continue
-            src_path = os.path.join(SURGE_DIR_PATH, name)
-            dst_path = os.path.join(dst, name)
-            shutil.copy2(src_path, dst_path)
-            elogger.info(f"✔ 保存 Surge 配置文件到：{dst_path}")
+        elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：unblockchn.acl.ruleset")
 
     @classmethod
     def cp_ruleset_file(cls, dst):
-        """复制目录下的 Surge ruleset 文件到 dst 文件夹"""
-        name = "unblockchn.surge.ruleset"
-        src_path = os.path.join(SURGE_DIR_PATH, name)
+        """复制目录下的 ACL ruleset 文件到 dst 文件夹"""
+        name = "unblockchn.acl.ruleset"
+        src_path = os.path.join(ACL_DIR_PATH, name)
         dst_path = os.path.join(dst, name)
         shutil.copy2(src_path, dst_path)
-        elogger.info(f"✔ 保存 Surge ruleset 文件到：{dst_path}")
+        elogger.info(f"✔ 保存 ACL ruleset 文件到：{dst_path}")
 
 
 class UnblockYouku(object):
