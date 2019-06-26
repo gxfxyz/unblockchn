@@ -9,6 +9,10 @@ ss-redir.pid
 unblockchn.log
 unblockchn.surge.ruleset
 config.py
+*.acl
+pac.txt
+unblockchn.acl.ruleset
+unblockchn.pac.ruleset
 
 # JetBrains
 .idea/
