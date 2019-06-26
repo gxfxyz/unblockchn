@@ -1260,8 +1260,11 @@ Unblock CHN
                     domain = domain.replace(".", "\.")
                     rule = f"(^|\.){domain}$"
                 else:  # DOMAIN
-                    domain = domain.replace(".", "\.")
-                    rule = f"(^|\.){domain}$"
+                    if is_ipv4(domain):
+                        rule = f"{domain}"  
+                    else:
+                        domain = domain.replace(".", "\.")
+                        rule = f"(^|\.){domain}$"
                 black_rules.append(rule)
         else:
             for domain in black_domains:
@@ -1310,6 +1313,20 @@ Unblock CHN
                     for line in infile:
                         f.write(line)
         elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：pac.txt")
+    @classmethod
+    def is_ipv4(ip):
+    	match = re.match("^(\d{0,3})\.(\d{0,3})\.(\d{0,3})\.(\d{0,3})$", ip)
+    	if not match:
+    		return False
+    	quad = []
+    	for number in match.groups():
+    		quad.append(int(number))
+    	if quad[0] < 1:
+    		return False
+    	for number in quad:
+    		if number > 255 or number < 0:
+    			return False
+    return True
 
     @classmethod
     def cp_ruleset_file(cls, dst):
