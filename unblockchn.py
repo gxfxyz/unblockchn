@@ -1326,7 +1326,7 @@ Unblock CHN
     	for number in quad:
     		if number > 255 or number < 0:
     			return False
-    return True
+        return True
 
     @classmethod
     def cp_ruleset_file(cls, dst):
