@@ -1313,6 +1313,7 @@ Unblock CHN
                     for line in infile:
                         f.write(line)
         elogger.info("✔ 生成 ACL ruleset 文件（acl 目录）：pac.txt")
+        
     @classmethod
     def is_ipv4(ip):
         match = re.match("^(\d{0,3})\.(\d{0,3})\.(\d{0,3})\.(\d{0,3})$", ip)
@@ -1326,7 +1327,7 @@ Unblock CHN
         for number in quad:
             if number > 255 or number < 0:
             return False
-    return True
+        return True
 
     @classmethod
     def cp_ruleset_file(cls, dst):
