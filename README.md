@@ -1,6 +1,6 @@
 # Unblock CHN
 
-Unblock CHN 是一个帮助配置 Shadowsocks 回国代理分流的命令行小工具，实现通过路由器或 Surge 自动分流，将国内一些网站的访问通过 Shadowsocks 代理回国，用以解除这些网站的海外访问限制，其它流量则会正常直连不走回国代理。
+Unblock CHN 是一个帮助配置 Shadowsocks 回国解锁代理分流的命令行小工具，实现通过路由器或 Surge 自动分流，将国内一些网站的访问通过 Shadowsocks 代理回国，用以解除这些网站的海外访问限制，其它流量则会正常直连不走回国代理。
 
 当然前提是你需要有一台位于国内的 Shadowsocks 服务器，在国内的路由器上[部署 Shadowsocks 服务器端](https://github.com/gxfxyz/unblockchn/wiki/在华硕梅林固件（Asuswrt-Merlin）路由器上部署-Shadowsocks-服务器端（ss-server）)也是可行的。
 
