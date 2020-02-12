@@ -810,13 +810,13 @@ Unblock CHN 还原路由器为未配置状态
             ologger.error("✘ 代理服务器都无法连接")
             sys.exit(1)
         fastest_conf = min(working_confs, key=lambda x: x['latency'])
-        fastest_conf_name = min(confs, key=lambda x: confs[x]['latency'])
+        fastest_conf_name = fastest_conf['name']
         return fastest_conf_name
 
     @classmethod
     def get_connection_time(cls, hostname, port, times=3, timeout=5):
         """测试连接延迟"""
-        ip = socket.gethostbyname(hostname)
+        ip = socket.getaddrinfo(hostname, None)[0][4][0]
         start = time.perf_counter()
         for _ in range(times):
             socket.create_connection((ip, port), timeout)
