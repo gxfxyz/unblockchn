@@ -252,8 +252,8 @@ Unblock CHN 路由器命令：
         cls.start_ss_redir()
 
         selected_conf = confs[selected_conf_name]
-        latencty_info = f"（{selected_conf['latency'] * 1000:.0f} ms）" if 'latency' in selected_conf else ""
-        ologger.info(f"切换到了 {selected_conf_name} 代理服务器{latencty_info}")
+        latency_info = f"（{selected_conf['latency'] * 1000:.0f} ms）" if 'latency' in selected_conf else ""
+        ologger.info(f"切换到了 {selected_conf_name} 代理服务器{latency_info}")
 
     @classmethod
     def cmd_check(cls, raw_args):
