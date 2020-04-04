@@ -166,7 +166,7 @@ $ python3 unblockchn.py router setup --no-ss
 
 至此，回国代理和自动分流就配置并开启好了。
 
-可以访问下列地址以验证回国代理是否成功，如果显示 `true`，就说明回国代理已生效： 
+可以访问下列地址以验证回国代理是否成功，如果显示 `true`，就说明回国代理已生效：
 
 http://uku.im/check
 
@@ -383,7 +383,7 @@ $ python3 unblockchn.py router renew
 
 ![unblockchn_shortcut](https://user-images.githubusercontent.com/43481676/56479612-28c83b00-646b-11e9-8a06-476e8eaa017f.jpg)
 
-[点此安装（版本：2019.04.21）](https://www.icloud.com/shortcuts/ebd706e862d14a10915df0b466a11ef5)
+[点此安装（版本：2020.04.04）](https://www.icloud.com/shortcuts/2214d1c7c80f4918922d1e801c5b0210)
 
 #### Alfred Workflow
 
@@ -391,7 +391,7 @@ $ python3 unblockchn.py router renew
 
 ![unblockchn_alfred](https://user-images.githubusercontent.com/43481676/56479251-4b595480-6469-11e9-8c60-3b3d80ed4350.png)
 
-[点此下载（版本：2019.04.21）](https://github.com/gxfxyz/unblockchn/raw/master/unblockchn.alfredworkflow)
+[点此下载（版本：2020.04.04）](https://github.com/gxfxyz/unblockchn/raw/master/unblockchn.alfredworkflow)
 
 **关键词：**
 
@@ -531,7 +531,7 @@ $ python3 unblockchn.py surge
 
 Unblock CHN 就会在 `surge` 子目录下生成模板文件 `surge.conf.tpl` 对应的 Surge 配置文件 `surge.conf`。
 
-Surge 或 Shadowrocket 载入配置文件后，可以访问下列地址以验证回国代理是否成功，如果显示 `true`，就说明回国代理已生效： 
+Surge 或 Shadowrocket 载入配置文件后，可以访问下列地址以验证回国代理是否成功，如果显示 `true`，就说明回国代理已生效：
 
 http://uku.im/check
 
@@ -599,7 +599,7 @@ $ python3 unblockchn.py surge --ruleset
    1. 更新前还原路由器为未配置状态：`python3 unblockchn.py router restore`
 
    2. 更新：`git pull`
-   
+
    3. 更新后重新配置路由器：`python3 unblockchn.py router setup`
 
 5. `default_config.py` 里有一些配置项，你可以将其复制为 `config.py` 后进行修改，`config.py` 内的配置会覆盖 `default_config.py` 内的配置。
