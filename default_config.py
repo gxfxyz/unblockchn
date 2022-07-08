@@ -13,8 +13,8 @@ SURGE_DIR_PATH = os.path.join(DIR_PATH, "surge")
 # shadowsocks 子目录路径
 SHADOWSOCKS_DIR_PATH = os.path.join(DIR_PATH, "shadowsocks")
 
-# Unblock Youku 的规则文件 urls.js 链接
-UNBLOCK_YOUKU_URLSJS_URL = "https://raw.githubusercontent.com/uku/Unblock-Youku/master/shared/urls.js"
+# Unblock Youku 的规则文件 urls.mjs 链接
+UNBLOCK_YOUKU_URLSJS_URL = "https://raw.githubusercontent.com/uku/Unblock-Youku/master/configs/urls.mjs"
 
 
 # --- router ---
@@ -47,6 +47,11 @@ ADD_IPTABLES_CHN_CMD = f"iptables -t nat -A PREROUTING -p tcp -m set --match-set
 DELETE_IPTABLES_CHN_CMD = f"iptables -t nat -D PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {SS_REDIR_LOCAL_PORT}"
 # iptables 检查 chn ipset 规则命令
 CHECK_IPTABLES_CHN_CMD = f"iptables -t nat -C PREROUTING -p tcp -m set --match-set chn dst -j REDIRECT --to-port {SS_REDIR_LOCAL_PORT}"
+
+# iptables 添加 ads ipset 规则命令
+ADD_IPTABLES_ADS_CMD = f"iptables -I FORWARD -p tcp -m set --match-set ads dst -j REJECT"
+# iptables 删除 ads ipset 规则命令
+DELETE_IPTABLES_ADS_CMD = f"iptables -D FORWARD -p tcp -m set --match-set ads dst -j REJECT"
 
 # ipset 规则配置文件在 jffs 分区下的保存路径
 IPSET_CONF_JFFS_PATH = "/jffs/configs/ipset.rules"

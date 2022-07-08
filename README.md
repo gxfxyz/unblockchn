@@ -109,6 +109,7 @@ Unblock CHN 路由器命令：
   setup [--no-ss]           一键配置路由器 [--no-ss: 跳过配置 ss-redir]
   restore [--no-ss]         还原路由器为未配置状态 [--no-ss: 跳过还原 ss-redir]
   create                    仅生成 ipset 和 dnsmasq 规则配置文件
+  add <URL/IP/域名>         添加 dnsmasq 规则到配置文件 [--ads:此<URL/IP/域名>为广告] [--comment <COMMENT>]
 
 positional arguments:
   {status,on,off,servers,switch,check,renew,setup,restore,create}
