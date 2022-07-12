@@ -356,7 +356,7 @@ Unblock CHN 一键配置路由器
 
     @classmethod
     def cmd_restore(cls, raw_args):
-        """python3 unblockchn.py router setup [-h] [--no-ss]
+        """python3 unblockchn.py router restore [--no-ss]
 
 Unblock CHN 还原路由器为未配置状态
 """
@@ -577,7 +577,6 @@ Unblock CHN 还原路由器为未配置状态
         comment = "# Load ipset rules"
         cls.append_to_script(NAT_START_SCRIPT_PATH, comment, ipset_cmd)
         elogger.info(f"✔ 保存 ipset 载入命令到路由器的 nat-start 启动脚本中：{NAT_START_SCRIPT_PATH}")
-
         # 添加 iptables 规则
         iptables_chn_exists = cls.check_iptables_chn()
         if not iptables_chn_exists:
@@ -1194,13 +1193,13 @@ class UnblockYouku(object):
         if self._white_urls is not None:
             return self._white_urls
 
-        # chrome_proxy_bypass_urls = self.extract('chrome_proxy_bypass_urls')
+        proxy_bypass_urls = self.extract('PROXY_BYPASS_URLS')
         # pac_proxy_bypass_urls = self.extract('pac_proxy_bypass_urls')
 
         self._white_urls = []
-        # self._white_urls = chrome_proxy_bypass_urls + pac_proxy_bypass_urls
-        # self._white_urls = list(set(self._white_urls))
-        # self._white_urls.sort()
+        self._white_urls = proxy_bypass_urls
+        self._white_urls = list(set(self._white_urls))
+        self._white_urls.sort()
 
         return self._white_urls
 
@@ -1248,7 +1247,6 @@ class UnblockYouku(object):
         s = re.sub(r"(?<!:)//.+", "", s)  # 去除注释
         s = re.sub(r",\s*\]", "\n]", s)  # 去除跟在最后一个元素后面的逗号
         urls = json.loads(s)
-        print(urls)
         return urls
 
 
